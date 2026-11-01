@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="cosmos_base">#080615</color>
+    <color name="violet_primary">#8B63F6</color>
+    <color name="violet_variant">#6C44D6</color>
+    <color name="surface_card">#13102B</color>
+    <color name="recording_red">#EF4444</color>
+    <color name="gold_accent">#F59E0B</color>
+</resources>

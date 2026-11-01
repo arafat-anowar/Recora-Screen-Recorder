@@ -1,0 +1,67 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Outer cosmic subtle orbital ring -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#382E6E"
+        android:strokeWidth="1.5"
+        android:pathData="M54,54m-42,0a42,42 0 1,0 84,0a42,42 0 1,0 -84,0" />
+
+    <!-- Second glowing ring -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#5642A6"
+        android:strokeWidth="2"
+        android:pathData="M54,54m-34,0a34,34 0 1,0 68,0a34,34 0 1,0 -68,0" />
+
+    <!-- 3D Violet Orb Main Body -->
+    <path android:pathData="M54,54m-26,0a26,26 0 1,0 52,0a26,26 0 1,0 -52,0">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="32"
+                android:startY="30"
+                android:endX="76"
+                android:endY="78"
+                android:startColor="#A78BFA"
+                android:endColor="#6D28D9" />
+        </aapt:attr>
+    </path>
+
+    <!-- Inner White Highlight Ring -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeAlpha="0.4"
+        android:strokeWidth="1.2"
+        android:pathData="M54,54m-20,0a20,20 0 1,0 40,0a20,20 0 1,0 -40,0" />
+
+    <!-- White Inner Aperture Ring -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M54,54m-16,0a16,16 0 1,0 32,0a16,16 0 1,0 -32,0" />
+
+    <!-- Ruby Core Recording Lens (3D gradient) -->
+    <path android:pathData="M54,54m-12,0a12,12 0 1,0 24,0a12,12 0 1,0 -24,0">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="44"
+                android:startY="44"
+                android:endX="64"
+                android:endY="64"
+                android:startColor="#F87171"
+                android:endColor="#DC2626" />
+        </aapt:attr>
+    </path>
+
+    <!-- Center Light Reflection / Lens Flare -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillAlpha="0.9"
+        android:pathData="M54,54m-3.5,0a3.5,3.5 0 1,0 7,0a3.5,3.5 0 1,0 -7,0" />
+</vector>

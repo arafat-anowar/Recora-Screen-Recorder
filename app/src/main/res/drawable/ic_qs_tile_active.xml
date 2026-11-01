@@ -1,0 +1,41 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Top-left curved bracket -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFEF4444"
+        android:strokeWidth="2.2"
+        android:strokeLineCap="round"
+        android:pathData="M8,4 H6 C4.89,4 4,4.89 4,6 V8" />
+    <!-- Top-right curved bracket -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFEF4444"
+        android:strokeWidth="2.2"
+        android:strokeLineCap="round"
+        android:pathData="M16,4 H18 C19.11,4 20,4.89 20,6 V8" />
+    <!-- Bottom-left curved bracket -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFEF4444"
+        android:strokeWidth="2.2"
+        android:strokeLineCap="round"
+        android:pathData="M4,16 V18 C4,19.11 4.89,20 6,20 H8" />
+    <!-- Bottom-right curved bracket -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFEF4444"
+        android:strokeWidth="2.2"
+        android:strokeLineCap="round"
+        android:pathData="M20,16 V18 C20,19.11 19.11,20 18,20 H16" />
+    <!-- Active recording filled red core with white inner dot -->
+    <path
+        android:fillColor="#FFEF4444"
+        android:pathData="M12,12m-4,0a4,4 0 1,0 8,0a4,4 0 1,0 -8,0" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,12m-1.5,0a1.5,1.5 0 1,0 3,0a1.5,1.5 0 1,0 -3,0" />
+</vector>
