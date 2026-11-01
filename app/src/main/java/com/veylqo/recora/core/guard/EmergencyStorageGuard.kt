@@ -9,7 +9,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.File
 
-class EmergencyStorageGuard(
+open class EmergencyStorageGuard(
     private val checkIntervalMs: Long = 3000L
 ) {
     companion object {
@@ -25,7 +25,7 @@ class EmergencyStorageGuard(
 
     private var monitoringJob: Job? = null
 
-    fun getAvailableBytes(path: File): Long {
+    open fun getAvailableBytes(path: File): Long {
         return try {
             val stat = StatFs(path.absolutePath)
             stat.availableBlocksLong * stat.blockSizeLong

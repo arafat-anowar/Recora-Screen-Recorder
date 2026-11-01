@@ -7,7 +7,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.animation.with
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -56,7 +56,7 @@ fun CountdownOverlay(
                 AnimatedContent(
                     targetState = secondsRemaining,
                     transitionSpec = {
-                        (fadeIn(animationSpec = tween(180)) + scaleIn(initialScale = 1.3f)) with
+                        (fadeIn(animationSpec = tween(180)) + scaleIn(initialScale = 1.3f)) togetherWith
                                 (fadeOut(animationSpec = tween(180)) + scaleOut(targetScale = 0.7f))
                     },
                     label = "CountdownDigit"

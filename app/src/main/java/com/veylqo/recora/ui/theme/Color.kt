@@ -8,6 +8,11 @@ val CosmosSurfaceVariant = Color(0xFF1A153A)
 val CosmosBorder = Color(0xFF26204D)
 val CosmosCardBorder = Color(0xFF2E2659)
 
+val CosmicBase = CosmosBase
+val CosmicSurface = CosmosSurface
+val CosmicBorder = CosmosBorder
+val CosmicCardBorder = CosmosCardBorder
+
 val VioletPrimary = Color(0xFF8B63F6)
 val VioletSecondary = Color(0xFF6C44D6)
 val VioletGlow = Color(0xFFA78BFA)

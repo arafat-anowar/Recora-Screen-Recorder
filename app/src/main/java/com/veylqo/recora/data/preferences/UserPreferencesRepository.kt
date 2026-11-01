@@ -33,13 +33,9 @@ data class RecoraSettings(
     val showTouches: Boolean = false,
     val hapticFeedback: Boolean = true,
     val smoothAnimations: Boolean = true,
-    val entitlement: UserEntitlement = UserEntitlement.PRO_MEMBER_DEFAULT,
+    val entitlement: UserEntitlement = UserEntitlement.MONTHLY,
     val promoBannerDismissed: Boolean = false
-) {
-    companion object {
-        val PRO_MEMBER_DEFAULT = UserEntitlement.MONTHLY
-    }
-}
+)
 
 class UserPreferencesRepository(private val context: Context) {
     private object Keys {
