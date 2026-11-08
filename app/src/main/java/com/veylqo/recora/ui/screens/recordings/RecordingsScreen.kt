@@ -32,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.veylqo.recora.data.model.ClipItem
+import com.veylqo.recora.data.storage.StorageInfo
 import com.veylqo.recora.ui.components.ClipRow
 import com.veylqo.recora.ui.theme.CardBg
 import com.veylqo.recora.ui.theme.CardBorder
@@ -44,6 +45,7 @@ import com.veylqo.recora.ui.theme.TextPrimary
 @Composable
 fun RecordingsScreen(
     clips: List<ClipItem>,
+    storageInfo: StorageInfo,
     onClipMenuClick: (ClipItem) -> Unit,
     onClipPlayClick: (ClipItem) -> Unit,
     modifier: Modifier = Modifier
@@ -71,7 +73,7 @@ fun RecordingsScreen(
             }
         }
 
-        // Storage status bar card
+        // Real Storage status bar card
         item {
             Box(
                 modifier = Modifier
@@ -104,7 +106,7 @@ fun RecordingsScreen(
                         }
 
                         Text(
-                            text = "45.2 GB free",
+                            text = storageInfo.freeText,
                             fontSize = 12.sp,
                             color = TextMuted
                         )
@@ -113,7 +115,7 @@ fun RecordingsScreen(
                     Spacer(modifier = Modifier.height(10.dp))
 
                     LinearProgressIndicator(
-                        progress = { 0.35f },
+                        progress = { storageInfo.usedProgress },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(6.dp)
@@ -148,7 +150,7 @@ fun RecordingsScreen(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Record your screen and your videos will appear here.",
+                        text = "Recorded videos saved in Movies/Recora will appear here.",
                         fontSize = 13.sp,
                         color = TextMuted
                     )

@@ -1,9 +1,22 @@
 package com.veylqo.recora
 
+import android.Manifest
+import android.app.Activity
+import android.app.StatusBarManager
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.media.projection.MediaProjectionManager
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -15,12 +28,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -31,19 +42,30 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import com.veylqo.recora.data.model.AudioSource
 import com.veylqo.recora.data.model.ClipItem
 import com.veylqo.recora.data.model.CountdownTimer
 import com.veylqo.recora.data.model.RecordUiState
-import com.veylqo.recora.data.model.sampleClips
+import com.veylqo.recora.data.model.VideoFps
+import com.veylqo.recora.data.model.VideoOrientation
+import com.veylqo.recora.data.model.VideoResolution
+import com.veylqo.recora.data.storage.MediaStoreRepository
+import com.veylqo.recora.data.storage.StorageInfo
+import com.veylqo.recora.service.RecoraTileService
+import com.veylqo.recora.service.RecordingService
+import com.veylqo.recora.service.RecordingStatus
+import com.veylqo.recora.service.encoder.DeviceCodecInfo
 import com.veylqo.recora.ui.components.GalaxyBackground
 import com.veylqo.recora.ui.components.GlassNavBar
 import com.veylqo.recora.ui.dialogs.DeleteConfirmDialog
 import com.veylqo.recora.ui.dialogs.InfoDialog
 import com.veylqo.recora.ui.dialogs.RedeemCodeDialog
+import com.veylqo.recora.ui.dialogs.RenameDialog
 import com.veylqo.recora.ui.navigation.NavTab
 import com.veylqo.recora.ui.screens.more.MoreScreen
 import com.veylqo.recora.ui.screens.record.CountdownScreen
@@ -62,8 +84,10 @@ import com.veylqo.recora.ui.theme.RecoraTheme
 import com.veylqo.recora.ui.theme.TextPrimary
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -77,35 +101,61 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun RecoraApp() {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val mediaStoreRepo = remember { MediaStoreRepository(context) }
+
     var currentTab by remember { mutableStateOf(NavTab.Record) }
     var uiState by remember { mutableStateOf(RecordUiState()) }
 
-    // Recording and Countdown State
-    var isCountingDown by remember { mutableStateOf(false) }
-    var isRecording by remember { mutableStateOf(false) }
-    var isPaused by remember { mutableStateOf(false) }
-    var recordingSeconds by remember { mutableIntStateOf(0) }
+    // Service Recording State
+    val serviceState by RecordingService.serviceState.collectAsState()
+    val isRecording = serviceState.status == RecordingStatus.RECORDING || serviceState.status == RecordingStatus.PAUSED
+    val isPaused = serviceState.status == RecordingStatus.PAUSED
 
-    // Recorded Clips State
-    val clipList = remember { mutableStateListOf<ClipItem>().apply { addAll(sampleClips) } }
+    // Countdown state
+    var isCountingDown by remember { mutableStateOf(false) }
+    var pendingProjectionData by remember { mutableStateOf<Pair<Int, Intent>?>(null) }
+
+    // MediaStore Clips List & Storage info
+    val clipList = remember { mutableStateListOf<ClipItem>() }
+    var storageInfo by remember { mutableStateOf(StorageInfo("Scanning storage...", 0.35f)) }
+
+    fun refreshRecordings() {
+        coroutineScope.launch {
+            val items = mediaStoreRepo.queryRecordedVideos()
+            clipList.clear()
+            clipList.addAll(items)
+            storageInfo = mediaStoreRepo.getStorageHeadroom()
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        refreshRecordings()
+    }
+
+    // Refresh when recording finishes
+    LaunchedEffect(serviceState.status) {
+        if (serviceState.status == RecordingStatus.STOPPED) {
+            refreshRecordings()
+        }
+    }
+
+    // Active bottom sheets & dialogs
     var selectedClipForMenu by remember { mutableStateOf<ClipItem?>(null) }
     var clipToDelete by remember { mutableStateOf<ClipItem?>(null) }
+    var clipToRename by remember { mutableStateOf<ClipItem?>(null) }
 
-    // Sheet visibility states
     var showAudioSheet by remember { mutableStateOf(false) }
     var showQualitySheet by remember { mutableStateOf(false) }
     var showOrientationSheet by remember { mutableStateOf(false) }
     var showTimerSheet by remember { mutableStateOf(false) }
     var showPlanSheet by remember { mutableStateOf(false) }
     var showRedeemDialog by remember { mutableStateOf(false) }
-
-    // Info dialog state
     var infoDialogData by remember { mutableStateOf<Pair<String, String>?>(null) }
 
     // Floating toast pill
     var toastMessage by remember { mutableStateOf<String?>(null) }
-    val coroutineScope = rememberCoroutineScope()
-
     fun showToast(message: String) {
         toastMessage = message
         coroutineScope.launch {
@@ -116,20 +166,87 @@ fun RecoraApp() {
         }
     }
 
-    // Recording duration timer
-    LaunchedEffect(isRecording, isPaused) {
-        if (isRecording && !isPaused) {
-            while (true) {
-                delay(1000)
-                recordingSeconds++
+    // Launch Service with projection intent
+    fun executeStartService(resultCode: Int, resultData: Intent) {
+        val (w, h) = when (uiState.resolution) {
+            VideoResolution.UHD -> 3840 to 2160
+            VideoResolution.QHD -> 2560 to 1440
+            VideoResolution.FHD -> 1920 to 1080
+        }
+        val (finalW, finalH) = if (uiState.orientation == VideoOrientation.Landscape) {
+            maxOf(w, h) to minOf(w, h)
+        } else {
+            minOf(w, h) to maxOf(w, h)
+        }
+
+        val fpsVal = if (uiState.fps == VideoFps.FPS_60) 60 else 30
+
+        val serviceIntent = Intent(context, RecordingService::class.java).apply {
+            action = RecordingService.ACTION_START
+            putExtra(RecordingService.EXTRA_RESULT_CODE, resultCode)
+            putExtra(RecordingService.EXTRA_RESULT_DATA, resultData)
+            putExtra(RecordingService.EXTRA_AUDIO_SOURCE, uiState.audioSource.name)
+            putExtra(RecordingService.EXTRA_WIDTH, finalW)
+            putExtra(RecordingService.EXTRA_HEIGHT, finalH)
+            putExtra(RecordingService.EXTRA_FPS, fpsVal)
+            putExtra(RecordingService.EXTRA_QUALITY_LABEL, "${uiState.resolution.label} · ${uiState.fps.label}")
+            putExtra(RecordingService.EXTRA_AUDIO_LABEL, uiState.audioSource.displayName)
+        }
+
+        ContextCompat.startForegroundService(context, serviceIntent)
+        showToast("Screen recording started")
+    }
+
+    // Projection consent launcher
+    val projectionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK && result.data != null) {
+            if (uiState.timer == CountdownTimer.Off) {
+                executeStartService(result.resultCode, result.data!!)
+            } else {
+                pendingProjectionData = result.resultCode to result.data!!
+                isCountingDown = true
             }
+        } else {
+            showToast("Screen recording permission was cancelled")
         }
     }
 
-    val durationFormatted = remember(recordingSeconds) {
-        val minutes = recordingSeconds / 60
-        val seconds = recordingSeconds % 60
-        String.format("%02d:%02d", minutes, seconds)
+    // Permission launcher for Audio and Notifications
+    val permissionsLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { grants ->
+        val audioGranted = grants[Manifest.permission.RECORD_AUDIO] ?: true
+        val projManager = context.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+        projectionLauncher.launch(projManager.createScreenCaptureIntent())
+    }
+
+    fun requestRecordingStart() {
+        val neededPermissions = mutableListOf<String>()
+        if (uiState.audioSource != AudioSource.None) {
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                neededPermissions.add(Manifest.permission.RECORD_AUDIO)
+            }
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                neededPermissions.add(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+
+        if (neededPermissions.isNotEmpty()) {
+            permissionsLauncher.launch(neededPermissions.toTypedArray())
+        } else {
+            val projManager = context.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+            projectionLauncher.launch(projManager.createScreenCaptureIntent())
+        }
+    }
+
+    val durationFormatted = remember(serviceState.durationSeconds) {
+        val min = serviceState.durationSeconds / 60
+        val sec = serviceState.durationSeconds % 60
+        String.format(Locale.US, "%02d:%02d", min, sec)
     }
 
     GalaxyBackground(reduceMotion = !uiState.smoothAnimations) {
@@ -139,17 +256,18 @@ fun RecoraApp() {
                     initialSeconds = uiState.timer.seconds,
                     onCountdownComplete = {
                         isCountingDown = false
-                        isRecording = true
-                        recordingSeconds = 0
-                        isPaused = false
-                        showToast("Recording started")
+                        pendingProjectionData?.let { (code, data) ->
+                            executeStartService(code, data)
+                        }
+                        pendingProjectionData = null
                     },
                     onCancel = {
                         isCountingDown = false
+                        pendingProjectionData = null
+                        showToast("Recording cancelled")
                     }
                 )
             } else {
-                // Main Content Screen
                 Box(modifier = Modifier.fillMaxSize()) {
                     when (currentTab) {
                         NavTab.Record -> {
@@ -167,39 +285,23 @@ fun RecoraApp() {
                                 onToggleTouches = { uiState = uiState.copy(showTouches = it) },
                                 onStartRecordingClick = {
                                     if (isRecording) {
-                                        showToast("Recording is already in progress")
+                                        showToast("Recording already in progress")
                                     } else {
-                                        if (uiState.timer == CountdownTimer.Off) {
-                                            isRecording = true
-                                            recordingSeconds = 0
-                                            isPaused = false
-                                            showToast("Recording started")
-                                        } else {
-                                            isCountingDown = true
-                                        }
+                                        requestRecordingStart()
                                     }
                                 },
                                 onPauseResumeClick = {
-                                    isPaused = !isPaused
-                                    showToast(if (isPaused) "Recording paused" else "Recording resumed")
+                                    val action = if (isPaused) RecordingService.ACTION_RESUME else RecordingService.ACTION_PAUSE
+                                    val intent = Intent(context, RecordingService::class.java).apply { this.action = action }
+                                    context.startService(intent)
+                                    showToast(if (isPaused) "Recording resumed" else "Recording paused")
                                 },
                                 onStopRecordingClick = {
-                                    isRecording = false
-                                    val newTitle = "Recora_${System.currentTimeMillis() / 1000}.mp4"
-                                    clipList.add(
-                                        0,
-                                        ClipItem(
-                                            id = System.currentTimeMillis().toString(),
-                                            title = newTitle,
-                                            durationText = durationFormatted,
-                                            resolutionBadge = uiState.resolution.label,
-                                            fpsBadge = uiState.fps.label,
-                                            sizeText = "${((recordingSeconds * 0.8f) + 1.2f).toInt()} MB",
-                                            dateText = "Just now"
-                                        )
-                                    )
-                                    recordingSeconds = 0
-                                    showToast("Recording saved: $newTitle")
+                                    val intent = Intent(context, RecordingService::class.java).apply {
+                                        action = RecordingService.ACTION_STOP
+                                    }
+                                    context.startService(intent)
+                                    showToast("Stopping recording...")
                                 },
                                 onUpgradeClick = { showPlanSheet = true }
                             )
@@ -208,8 +310,24 @@ fun RecoraApp() {
                         NavTab.Recordings -> {
                             RecordingsScreen(
                                 clips = clipList,
+                                storageInfo = storageInfo,
                                 onClipMenuClick = { clip -> selectedClipForMenu = clip },
-                                onClipPlayClick = { clip -> showToast("Playing: ${clip.title}") }
+                                onClipPlayClick = { clip ->
+                                    val uriStr = clip.uriString
+                                    if (uriStr != null) {
+                                        try {
+                                            val viewIntent = Intent(Intent.ACTION_VIEW).apply {
+                                                setDataAndType(Uri.parse(uriStr), "video/mp4")
+                                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                            }
+                                            context.startActivity(viewIntent)
+                                        } catch (e: Exception) {
+                                            showToast("No compatible video player found")
+                                        }
+                                    } else {
+                                        showToast("Video file not available")
+                                    }
+                                }
                             )
                         }
 
@@ -229,7 +347,12 @@ fun RecoraApp() {
                                 },
                                 onSelectLifetime = { showPlanSheet = true },
                                 onOpenInfoDialog = { title, message ->
-                                    infoDialogData = title to message
+                                    if (title == "Device Compatibility") {
+                                        val realCodecInfo = DeviceCodecInfo.getDeviceCodecSummary()
+                                        infoDialogData = title to realCodecInfo
+                                    } else {
+                                        infoDialogData = title to message
+                                    }
                                 }
                             )
                         }
@@ -244,7 +367,7 @@ fun RecoraApp() {
                 }
             }
 
-            // Floating Toast Banner (like "Purchases restored" pill in design)
+            // Floating Toast Pill Banner
             AnimatedVisibility(
                 visible = toastMessage != null,
                 enter = fadeIn() + slideInVertically { it / 2 },
@@ -312,10 +435,33 @@ fun RecoraApp() {
             selectedClipForMenu?.let { clip ->
                 ClipActionSheet(
                     clip = clip,
-                    onPlay = { showToast("Playing: ${clip.title}") },
+                    onPlay = {
+                        val uriStr = clip.uriString
+                        if (uriStr != null) {
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW).apply {
+                                    setDataAndType(Uri.parse(uriStr), "video/mp4")
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                showToast("No compatible video player found")
+                            }
+                        }
+                    },
                     onEditAndTrim = { showToast("Opening editor for: ${clip.title}") },
-                    onShare = { showToast("Sharing: ${clip.title}") },
-                    onRename = { showToast("Rename ${clip.title}") },
+                    onShare = {
+                        val uriStr = clip.uriString
+                        if (uriStr != null) {
+                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                type = "video/mp4"
+                                putExtra(Intent.EXTRA_STREAM, Uri.parse(uriStr))
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                            context.startActivity(Intent.createChooser(shareIntent, "Share recording"))
+                        }
+                    },
+                    onRename = { clipToRename = clip },
                     onDelete = { clipToDelete = clip },
                     onDismiss = { selectedClipForMenu = null }
                 )
@@ -350,11 +496,43 @@ fun RecoraApp() {
                 DeleteConfirmDialog(
                     clipTitle = clip.title,
                     onConfirm = {
-                        clipList.remove(clip)
+                        val uriStr = clip.uriString
+                        if (uriStr != null) {
+                            coroutineScope.launch {
+                                val success = mediaStoreRepo.deleteVideo(Uri.parse(uriStr))
+                                if (success) {
+                                    showToast("Deleted ${clip.title}")
+                                    refreshRecordings()
+                                } else {
+                                    showToast("Could not delete file")
+                                }
+                            }
+                        }
                         clipToDelete = null
-                        showToast("Deleted ${clip.title}")
                     },
                     onDismiss = { clipToDelete = null }
+                )
+            }
+
+            clipToRename?.let { clip ->
+                RenameDialog(
+                    initialName = clip.title,
+                    onConfirm = { newName ->
+                        val uriStr = clip.uriString
+                        if (uriStr != null) {
+                            coroutineScope.launch {
+                                val success = mediaStoreRepo.renameVideo(Uri.parse(uriStr), newName)
+                                if (success) {
+                                    showToast("Renamed to $newName")
+                                    refreshRecordings()
+                                } else {
+                                    showToast("Could not rename file")
+                                }
+                            }
+                        }
+                        clipToRename = null
+                    },
+                    onDismiss = { clipToRename = null }
                 )
             }
 
