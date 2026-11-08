@@ -2,10 +2,12 @@ package com.veylqo.recora.service
 
 import android.app.PendingIntent
 import android.content.Intent
+import android.graphics.drawable.Icon
 import android.os.Build
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 import com.veylqo.recora.MainActivity
+import com.veylqo.recora.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -59,6 +61,9 @@ class RecoraTileService : TileService() {
         tile.state = if (isRecording) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
         tile.label = "Recora"
         tile.subtitle = if (isRecording) "Recording..." else "Tap to record"
+        try {
+            tile.icon = Icon.createWithResource(this, R.drawable.ic_qs_recora)
+        } catch (e: Exception) {}
         tile.updateTile()
     }
 }
