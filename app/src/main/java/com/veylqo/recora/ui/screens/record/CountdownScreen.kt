@@ -83,10 +83,10 @@ fun CountdownScreen(
             .padding(horizontal = 24.dp)
             .padding(top = 48.dp, bottom = 48.dp)
     ) {
-        // Center: Circular Countdown Chronometer matching reference design in app theme
+        // Center: Circular Countdown Chronometer with ONLY the countdown number inside
         Box(
             modifier = Modifier
-                .size(230.dp)
+                .size(220.dp)
                 .align(Alignment.Center)
                 .drawBehind {
                     val center = Offset(size.width / 2f, size.height / 2f)
@@ -129,71 +129,24 @@ fun CountdownScreen(
                 },
             contentAlignment = Alignment.Center
         ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-                modifier = Modifier.padding(horizontal = 20.dp)
-            ) {
-                // Big Countdown Number with smooth rolling transition
-                AnimatedContent(
-                    targetState = displaySeconds,
-                    transitionSpec = {
-                        (slideInVertically(animationSpec = tween(260, easing = FastOutSlowInEasing)) { height -> -height / 2 } + fadeIn(tween(180)))
-                            .togetherWith(
-                                slideOutVertically(animationSpec = tween(260, easing = FastOutSlowInEasing)) { height -> height / 2 } + fadeOut(tween(180))
-                            )
-                    },
-                    label = "CountdownDigitRoll"
-                ) { sec ->
-                    Text(
-                        text = "$sec",
-                        fontSize = 98.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(2.dp))
-
-                // "Recording starts in" subtitle
+            // Big Countdown Number with smooth rolling transition (ONLY the countdown number)
+            AnimatedContent(
+                targetState = displaySeconds,
+                transitionSpec = {
+                    (slideInVertically(animationSpec = tween(260, easing = FastOutSlowInEasing)) { height -> -height / 2 } + fadeIn(tween(180)))
+                        .togetherWith(
+                            slideOutVertically(animationSpec = tween(260, easing = FastOutSlowInEasing)) { height -> height / 2 } + fadeOut(tween(180))
+                        )
+                },
+                label = "CountdownDigitRoll"
+            ) { sec ->
                 Text(
-                    text = "Recording starts in",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Color.White.copy(alpha = 0.90f)
-                )
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                // "00:00:03" Digital Clock Format
-                Text(
-                    text = clockFormat,
-                    fontSize = 25.sp,
+                    text = "$sec",
+                    fontSize = 100.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace,
-                    letterSpacing = 1.sp,
                     color = Color.White
                 )
             }
-        }
-
-        // Bottom: Cancel Button
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .clip(RoundedCornerShape(32.dp))
-                .background(CardBg.copy(alpha = 0.85f))
-                .border(1.dp, CardBorder, RoundedCornerShape(32.dp))
-                .clickable { onCancel() }
-                .padding(horizontal = 46.dp, vertical = 13.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "Cancel",
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = TextPrimary
-            )
         }
     }
 }

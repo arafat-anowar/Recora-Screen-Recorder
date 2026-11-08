@@ -11,15 +11,11 @@ import android.graphics.Paint
 import android.graphics.PixelFormat
 import android.graphics.RectF
 import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
 import android.view.animation.LinearInterpolator
-import android.widget.LinearLayout
-import android.widget.TextView
-import java.util.Locale
 import kotlin.math.ceil
 
 class FloatingCountdownOverlay(private val context: Context) {
@@ -29,7 +25,8 @@ class FloatingCountdownOverlay(private val context: Context) {
     private var progressAnimator: ValueAnimator? = null
 
     /**
-     * Compact, custom canvas-drawn countdown dial (100% zero-blinking, zero square box artifacts)
+     * Compact floating countdown dial showing ONLY the countdown number centered inside.
+     * Zero-blinking, zero square box artifacts, 100% hardware-accelerated canvas.
      */
     private class CountdownDialView(context: Context) : View(context) {
         val density = resources.displayMetrics.density
@@ -51,7 +48,7 @@ class FloatingCountdownOverlay(private val context: Context) {
         // Paints for pure hardware-accelerated canvas rendering
         private val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.FILL
-            color = Color.parseColor("#E60D0A1E") // Translucent obsidian glass
+            color = Color.parseColor("#E60D0A1E") // Translucent dark obsidian glass
         }
 
         private val outerGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -75,22 +72,8 @@ class FloatingCountdownOverlay(private val context: Context) {
 
         private val numberTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
-            textSize = 38 * density
+            textSize = 48 * density
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            textAlign = Paint.Align.CENTER
-        }
-
-        private val subtitleTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#C4B5FD") // Soft lavender
-            textSize = 10 * density
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-            textAlign = Paint.Align.CENTER
-        }
-
-        private val clockTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.WHITE
-            textSize = 13 * density
-            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
             textAlign = Paint.Align.CENTER
         }
 
@@ -118,15 +101,9 @@ class FloatingCountdownOverlay(private val context: Context) {
             arcRect.set(cx - radius, cy - radius, cx + radius, cy + radius)
             canvas.drawArc(arcRect, startAngle, sweepAngle, false, activeArcPaint)
 
-            // 5. Giant Center Number (3, 2, 1)
-            canvas.drawText("$currentSeconds", cx, cy - (6 * density), numberTextPaint)
-
-            // 6. Subtitle "Starts in"
-            canvas.drawText("Starts in", cx, cy + (10 * density), subtitleTextPaint)
-
-            // 7. Monospace Digital Clock ("00:03", "00:02", "00:01")
-            val clockStr = String.format(Locale.US, "00:%02d", currentSeconds)
-            canvas.drawText(clockStr, cx, cy + (26 * density), clockTextPaint)
+            // 5. ONLY the Countdown Number centered directly in the middle of the circle
+            val textY = cy - ((numberTextPaint.descent() + numberTextPaint.ascent()) / 2f)
+            canvas.drawText("$currentSeconds", cx, textY, numberTextPaint)
         }
     }
 
@@ -157,57 +134,16 @@ class FloatingCountdownOverlay(private val context: Context) {
             gravity = Gravity.CENTER
         }
 
-        val container = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-        }
-
-        // Compact 116dp Dial View
-        val dialSize = (116 * density).toInt()
+        // Compact Dial View (110dp) directly added as the overlay view (No cancel button)
+        val dialSize = (110 * density).toInt()
         val dialView = CountdownDialView(context).apply {
-            layoutParams = LinearLayout.LayoutParams(dialSize, dialSize).apply {
-                gravity = Gravity.CENTER_HORIZONTAL
-            }
+            layoutParams = WindowManager.LayoutParams(dialSize, dialSize)
         }
-        container.addView(dialView)
 
-        // Sleek Minimalist "✕ Cancel" Pill underneath (0 elevation to avoid any square box artifacts)
-        val cancelPill = TextView(context).apply {
-            text = "✕ Cancel"
-            textSize = 12f
-            setTextColor(Color.parseColor("#E0D6FF"))
-            typeface = Typeface.DEFAULT_BOLD
-            gravity = Gravity.CENTER
-            val padH = (18 * density).toInt()
-            val padV = (6 * density).toInt()
-            setPadding(padH, padV, padH, padV)
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                topMargin = (10 * density).toInt()
-                gravity = Gravity.CENTER_HORIZONTAL
-            }
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.RECTANGLE
-                cornerRadius = 20 * density
-                setColor(Color.parseColor("#E6141029"))
-                setStroke((1.2f * density).toInt(), Color.parseColor("#4C3877"))
-            }
-            elevation = 0f
-            isClickable = true
-            isFocusable = false
-            setOnClickListener {
-                remove()
-                onCancel()
-            }
-        }
-        container.addView(cancelPill)
-
-        rootLayout = container
+        rootLayout = dialView
 
         try {
-            windowManager.addView(container, params)
+            windowManager.addView(dialView, params)
         } catch (e: Exception) {
             remove()
             onComplete()
@@ -227,7 +163,7 @@ class FloatingCountdownOverlay(private val context: Context) {
             addListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator) {
                     // Smooth, elegant exit
-                    container.animate()
+                    dialView.animate()
                         .alpha(0f)
                         .scaleX(0.7f)
                         .scaleY(0.7f)
