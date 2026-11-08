@@ -246,14 +246,29 @@ fun RecoraApp() {
         previewOverlayManager.removeAllOverlays()
 
         val (w, h) = when (uiState.resolution) {
+            VideoResolution.Native -> {
+                val wm = context.getSystemService(Context.WINDOW_SERVICE) as android.view.WindowManager
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    val bounds = wm.currentWindowMetrics.bounds
+                    bounds.width() to bounds.height()
+                } else {
+                    val dm = android.util.DisplayMetrics()
+                    @Suppress("DEPRECATION")
+                    wm.defaultDisplay.getRealMetrics(dm)
+                    dm.widthPixels to dm.heightPixels
+                }
+            }
             VideoResolution.UHD -> 3840 to 2160
             VideoResolution.QHD -> 2560 to 1440
             VideoResolution.FHD -> 1920 to 1080
         }
-        val (finalW, finalH) = if (uiState.orientation == VideoOrientation.Landscape) {
-            maxOf(w, h) to minOf(w, h)
-        } else {
-            minOf(w, h) to maxOf(w, h)
+        val (finalW, finalH) = when (uiState.orientation) {
+            VideoOrientation.Landscape -> maxOf(w, h) to minOf(w, h)
+            VideoOrientation.Portrait -> minOf(w, h) to maxOf(w, h)
+            VideoOrientation.Auto -> {
+                val isLandscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+                if (isLandscape) maxOf(w, h) to minOf(w, h) else minOf(w, h) to maxOf(w, h)
+            }
         }
 
         val fpsVal = if (uiState.fps == VideoFps.FPS_60) 60 else 30
@@ -553,10 +568,23 @@ fun RecoraApp() {
             }
 
             if (showQualitySheet) {
+                val (nativeW, nativeH) = remember {
+                    val wm = context.getSystemService(Context.WINDOW_SERVICE) as android.view.WindowManager
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        val bounds = wm.currentWindowMetrics.bounds
+                        bounds.width() to bounds.height()
+                    } else {
+                        val dm = android.util.DisplayMetrics()
+                        @Suppress("DEPRECATION")
+                        wm.defaultDisplay.getRealMetrics(dm)
+                        dm.widthPixels to dm.heightPixels
+                    }
+                }
                 QualityPickerSheet(
                     selectedResolution = uiState.resolution,
                     selectedFps = uiState.fps,
                     isProUser = uiState.isProUser,
+                    nativeResolutionText = "${minOf(nativeW, nativeH)} × ${maxOf(nativeW, nativeH)} (Native 1:1)",
                     onSelectResolution = { uiState = uiState.copy(resolution = it) },
                     onSelectFps = { uiState = uiState.copy(fps = it) },
                     onShowPlan = { showPlanSheet = true },

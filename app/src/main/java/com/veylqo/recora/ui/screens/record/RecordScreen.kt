@@ -344,14 +344,15 @@ fun RecordScreen(
             )
 
             // Card 2: Quality
-            val qualityText = "${state.resolution.label.split(" ").firstOrNull() ?: "FHD"} · ${state.fps.label}"
+            val qualityValue = when (state.resolution) {
+                com.veylqo.recora.data.model.VideoResolution.Native -> "Native · ${state.fps.label}"
+                com.veylqo.recora.data.model.VideoResolution.UHD -> "4K UHD · ${state.fps.label}"
+                com.veylqo.recora.data.model.VideoResolution.QHD -> "2K QHD · ${state.fps.label}"
+                com.veylqo.recora.data.model.VideoResolution.FHD -> "1080p · ${state.fps.label}"
+            }
             SettingGridCard(
                 title = "Quality",
-                value = "${state.resolution.label.replace("1080p ", "").replace("2K ", "").replace("4K ", "")} · ${state.fps.label}".let {
-                    if (state.resolution == com.veylqo.recora.data.model.VideoResolution.UHD) "4K UHD · ${state.fps.label}"
-                    else if (state.resolution == com.veylqo.recora.data.model.VideoResolution.QHD) "2K QHD · ${state.fps.label}"
-                    else "1080p · ${state.fps.label}"
-                },
+                value = qualityValue,
                 icon = Icons.Rounded.Tv,
                 onClick = onQualityClick,
                 modifier = Modifier.weight(1f)

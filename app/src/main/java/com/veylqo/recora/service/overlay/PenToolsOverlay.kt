@@ -15,7 +15,6 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
-import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -26,20 +25,32 @@ class PenToolsOverlay(
     private val onCloseClick: () -> Unit
 ) {
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-    private var rootLayout: FrameLayout? = null
-    private var drawingCanvasView: DrawingCanvasView? = null
-    private var windowParams: WindowManager.LayoutParams? = null
 
+    // Window 1: Fullscreen Transparent Canvas
+    private var canvasView: DrawingCanvasView? = null
+    private var canvasParams: WindowManager.LayoutParams? = null
+
+    // Window 2: Draggable Floating Toolbar Pill
+    private var toolbarView: View? = null
+    private var toolbarParams: WindowManager.LayoutParams? = null
+
+    // Drawing state
     private var currentColor = Color.parseColor("#7F5AF0")
     private var currentStrokeWidth = 12f
     private var isEraser = false
     private var isTouchThrough = false
 
+    private val STROKE_WIDTHS = listOf(6f, 14f, 26f)
+    private var strokeIndex = 1
+
     @SuppressLint("ClickableViewAccessibility")
     fun show() {
-        if (rootLayout != null) return
+        if (canvasView != null || toolbarView != null) return
 
-        val params = WindowManager.LayoutParams(
+        val density = context.resources.displayMetrics.density
+
+        // 1. Setup Fullscreen Drawing Canvas Window
+        val cParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -51,106 +62,144 @@ class PenToolsOverlay(
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
         )
-        windowParams = params
+        canvasParams = cParams
 
-        val frame = FrameLayout(context)
+        val canvas = DrawingCanvasView(context)
+        canvasView = canvas
 
-        // 1. Drawing Canvas
-        val canvasView = DrawingCanvasView(context)
-        drawingCanvasView = canvasView
-        frame.addView(canvasView, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.MATCH_PARENT
-        ))
-
-        // 2. Draggable Toolbar at Top Center
-        val toolbar = createToolbar(frame, params)
-        val density = context.resources.displayMetrics.density
-        val toolbarParams = FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.WRAP_CONTENT,
-            FrameLayout.LayoutParams.WRAP_CONTENT
+        // 2. Setup Floating Toolbar Window
+        val tParams = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            } else {
+                @Suppress("DEPRECATION")
+                WindowManager.LayoutParams.TYPE_PHONE
+            },
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-            topMargin = (50 * density).toInt()
+            y = (45 * density).toInt()
         }
-        frame.addView(toolbar, toolbarParams)
+        toolbarParams = tParams
 
-        rootLayout = frame
+        val toolbar = createToolbarView(density, tParams)
+        toolbarView = toolbar
+
         try {
-            windowManager.addView(frame, params)
+            windowManager.addView(canvas, cParams)
+            windowManager.addView(toolbar, tParams)
         } catch (e: Exception) {
-            rootLayout = null
+            remove()
+        }
+    }
+
+    private fun setTouchThroughMode(enabled: Boolean) {
+        isTouchThrough = enabled
+        canvasParams?.let { params ->
+            if (enabled) {
+                params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+            } else {
+                params.flags = params.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
+            }
+            try {
+                canvasView?.let { windowManager.updateViewLayout(it, params) }
+            } catch (e: Exception) {}
         }
     }
 
     fun remove() {
-        rootLayout?.let { frame ->
-            try {
-                windowManager.removeView(frame)
-            } catch (e: Exception) {}
-            rootLayout = null
-            drawingCanvasView = null
+        canvasView?.let {
+            try { windowManager.removeView(it) } catch (e: Exception) {}
+            canvasView = null
+        }
+        toolbarView?.let {
+            try { windowManager.removeView(it) } catch (e: Exception) {}
+            toolbarView = null
         }
     }
 
     @SuppressLint("ClickableViewAccessibility")
-    private fun createToolbar(frame: FrameLayout, params: WindowManager.LayoutParams): View {
-        val density = context.resources.displayMetrics.density
-
-        val toolbar = LinearLayout(context).apply {
+    private fun createToolbarView(density: Float, tParams: WindowManager.LayoutParams): View {
+        val container = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
-            setPadding((12 * density).toInt(), (8 * density).toInt(), (14 * density).toInt(), (8 * density).toInt())
+            setPadding((10 * density).toInt(), (7 * density).toInt(), (10 * density).toInt(), (7 * density).toInt())
             background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
-                cornerRadius = 60 * density
-                setColor(Color.parseColor("#F0120E29"))
+                cornerRadius = 32 * density
+                setColor(Color.parseColor("#F2141029"))
                 setStroke((1.5f * density).toInt(), Color.parseColor("#7F5AF0"))
             }
-            elevation = 26f
+            elevation = 30f
             gravity = Gravity.CENTER_VERTICAL
         }
 
-        // Drag handle for moving toolbar
+        // 1. Drag Handle
         val dragHandle = TextView(context).apply {
             text = "⋮⋮"
             setTextColor(Color.parseColor("#A58BFF"))
             textSize = 15f
-            setPadding((4 * density).toInt(), 0, (6 * density).toInt(), 0)
+            setPadding((2 * density).toInt(), 0, (6 * density).toInt(), 0)
         }
-        toolbar.addView(dragHandle)
+        container.addView(dragHandle)
 
-        var tInitialX = 0f
-        var tInitialY = 0f
+        var initialX = 0
+        var initialY = 0
+        var initialTouchX = 0f
+        var initialTouchY = 0f
+
         dragHandle.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
-                    tInitialX = event.rawX - toolbar.x
-                    tInitialY = event.rawY - toolbar.y
+                    initialX = tParams.x
+                    initialY = tParams.y
+                    initialTouchX = event.rawX
+                    initialTouchY = event.rawY
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    toolbar.x = event.rawX - tInitialX
-                    toolbar.y = event.rawY - tInitialY
+                    val dx = (event.rawX - initialTouchX).toInt()
+                    val dy = (event.rawY - initialTouchY).toInt()
+                    tParams.x = initialX + dx
+                    tParams.y = initialY + dy
+                    try { windowManager.updateViewLayout(container, tParams) } catch (e: Exception) {}
                     true
                 }
                 else -> false
             }
         }
 
-        // Color dots
-        val purpleDot = createColorDot(Color.parseColor("#7F5AF0"))
-        val pinkDot = createColorDot(Color.parseColor("#F0446A"))
-        val goldDot = createColorDot(Color.parseColor("#FFD21F"))
-        val whiteDot = createColorDot(Color.WHITE)
+        // 2. Mode Switch: Draw Mode (✏️) vs Touch Screen Mode (👆)
+        val modeBtn = createIconButton(android.R.drawable.ic_menu_edit, active = true, density) { view ->
+            isTouchThrough = !isTouchThrough
+            setTouchThroughMode(isTouchThrough)
+            (view as ImageView).setImageResource(
+                if (isTouchThrough) android.R.drawable.ic_input_get else android.R.drawable.ic_menu_edit
+            )
+            view.alpha = if (isTouchThrough) 0.5f else 1.0f
+        }
+        container.addView(modeBtn)
 
-        val colorDots = listOf(purpleDot, pinkDot, goldDot, whiteDot)
+        // 3. Color Dots
+        val purpleDot = createColorDot(Color.parseColor("#7F5AF0"), density)
+        val pinkDot = createColorDot(Color.parseColor("#F0446A"), density)
+        val goldDot = createColorDot(Color.parseColor("#FFD21F"), density)
+        val cyanDot = createColorDot(Color.parseColor("#00E5FF"), density)
+        val whiteDot = createColorDot(Color.WHITE, density)
 
-        fun selectColor(selectedDot: View, color: Int) {
+        val dots = listOf(purpleDot, pinkDot, goldDot, cyanDot, whiteDot)
+
+        fun selectColor(targetDot: View, color: Int) {
             currentColor = color
             isEraser = false
-            colorDots.forEach { dot ->
-                (dot.background as GradientDrawable).setStroke(
-                    if (dot == selectedDot) (3 * density).toInt() else 0,
+            setTouchThroughMode(false)
+            modeBtn.setImageResource(android.R.drawable.ic_menu_edit)
+            modeBtn.alpha = 1.0f
+            dots.forEach { d ->
+                (d.background as GradientDrawable).setStroke(
+                    if (d == targetDot) (3 * density).toInt() else 0,
                     Color.WHITE
                 )
             }
@@ -159,55 +208,65 @@ class PenToolsOverlay(
         purpleDot.setOnClickListener { selectColor(it, Color.parseColor("#7F5AF0")) }
         pinkDot.setOnClickListener { selectColor(it, Color.parseColor("#F0446A")) }
         goldDot.setOnClickListener { selectColor(it, Color.parseColor("#FFD21F")) }
+        cyanDot.setOnClickListener { selectColor(it, Color.parseColor("#00E5FF")) }
         whiteDot.setOnClickListener { selectColor(it, Color.WHITE) }
 
-        // Initial selection
         selectColor(purpleDot, Color.parseColor("#7F5AF0"))
 
-        toolbar.addView(purpleDot)
-        toolbar.addView(pinkDot)
-        toolbar.addView(goldDot)
-        toolbar.addView(whiteDot)
+        dots.forEach { container.addView(it) }
 
-        // Eraser button
-        val eraserBtn = createToolButton(android.R.drawable.ic_menu_delete) { view ->
+        // 4. Stroke Thickness Toggle Button
+        val strokeBtn = createIconButton(android.R.drawable.presence_online, active = false, density) { view ->
+            strokeIndex = (strokeIndex + 1) % STROKE_WIDTHS.size
+            currentStrokeWidth = STROKE_WIDTHS[strokeIndex]
+            val scale = when (strokeIndex) {
+                0 -> 0.7f
+                1 -> 1.0f
+                else -> 1.4f
+            }
+            view.scaleX = scale
+            view.scaleY = scale
+        }
+        container.addView(strokeBtn)
+
+        // 5. Eraser Button
+        val eraserBtn = createIconButton(android.R.drawable.ic_menu_delete, active = false, density) { view ->
             isEraser = !isEraser
+            setTouchThroughMode(false)
+            modeBtn.setImageResource(android.R.drawable.ic_menu_edit)
+            modeBtn.alpha = 1.0f
             view.alpha = if (isEraser) 1.0f else 0.45f
             if (isEraser) {
-                colorDots.forEach { dot ->
-                    (dot.background as GradientDrawable).setStroke(0, Color.TRANSPARENT)
-                }
+                dots.forEach { (it.background as GradientDrawable).setStroke(0, Color.TRANSPARENT) }
             }
         }
         eraserBtn.alpha = 0.45f
-        toolbar.addView(eraserBtn)
+        container.addView(eraserBtn)
 
-        // Undo button
-        toolbar.addView(createToolButton(android.R.drawable.ic_menu_revert) {
-            drawingCanvasView?.undo()
+        // 6. Undo Button
+        container.addView(createIconButton(android.R.drawable.ic_menu_revert, active = false, density) {
+            canvasView?.undo()
         })
 
-        // Clear all button
-        toolbar.addView(createToolButton(android.R.drawable.ic_menu_close_clear_cancel) {
-            drawingCanvasView?.clear()
+        // 7. Clear All Button
+        container.addView(createIconButton(android.R.drawable.ic_menu_close_clear_cancel, active = false, density) {
+            canvasView?.clear()
         })
 
-        // Close button
-        toolbar.addView(createToolButton(android.R.drawable.ic_lock_power_off) {
+        // 8. Close Button
+        container.addView(createIconButton(android.R.drawable.ic_lock_power_off, active = false, density) {
             remove()
             onCloseClick()
         })
 
-        return toolbar
+        return container
     }
 
-    private fun createColorDot(color: Int): View {
-        val density = context.resources.displayMetrics.density
-        val size = (24 * density).toInt()
-
+    private fun createColorDot(color: Int, density: Float): View {
+        val size = (22 * density).toInt()
         return View(context).apply {
             layoutParams = LinearLayout.LayoutParams(size, size).apply {
-                setMargins((4 * density).toInt(), 0, (4 * density).toInt(), 0)
+                setMargins((3 * density).toInt(), 0, (3 * density).toInt(), 0)
             }
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
@@ -217,16 +276,14 @@ class PenToolsOverlay(
         }
     }
 
-    private fun createToolButton(iconRes: Int, onClick: (View) -> Unit): ImageView {
-        val density = context.resources.displayMetrics.density
-        val size = (34 * density).toInt()
-        val pad = (7 * density).toInt()
-
+    private fun createIconButton(iconRes: Int, active: Boolean, density: Float, onClick: (View) -> Unit): ImageView {
+        val size = (32 * density).toInt()
+        val pad = (6 * density).toInt()
         return ImageView(context).apply {
             setImageResource(iconRes)
             setPadding(pad, pad, pad, pad)
             layoutParams = LinearLayout.LayoutParams(size, size).apply {
-                setMargins((4 * density).toInt(), 0, (4 * density).toInt(), 0)
+                setMargins((2 * density).toInt(), 0, (2 * density).toInt(), 0)
             }
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
@@ -274,6 +331,8 @@ class PenToolsOverlay(
 
         @SuppressLint("ClickableViewAccessibility")
         override fun onTouchEvent(event: MotionEvent): Boolean {
+            if (isTouchThrough) return false
+
             val x = event.x
             val y = event.y
 
@@ -281,9 +340,7 @@ class PenToolsOverlay(
                 MotionEvent.ACTION_DOWN -> {
                     previousX = x
                     previousY = y
-                    val path = Path().apply {
-                        moveTo(x, y)
-                    }
+                    val path = Path().apply { moveTo(x, y) }
                     currentPath = path
 
                     val paint = Paint().apply {
@@ -292,7 +349,7 @@ class PenToolsOverlay(
                         style = Paint.Style.STROKE
                         strokeJoin = Paint.Join.ROUND
                         strokeCap = Paint.Cap.ROUND
-                        strokeWidth = if (isEraser) 48f else currentStrokeWidth
+                        strokeWidth = if (isEraser) 52f else currentStrokeWidth
                         color = if (isEraser) Color.TRANSPARENT else currentColor
                         if (isEraser) {
                             xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR)

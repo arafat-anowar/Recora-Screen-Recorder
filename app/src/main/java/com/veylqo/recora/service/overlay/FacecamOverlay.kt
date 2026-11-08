@@ -44,6 +44,8 @@ class FacecamOverlay(
     private var cameraProvider: ProcessCameraProvider? = null
 
     private var currentSizeIndex = 0
+    private var currentRotationDegrees = 0f
+    private var isFrontCamera = true
 
     init {
         lifecycleRegistry.currentState = Lifecycle.State.INITIALIZED
@@ -92,6 +94,7 @@ class FacecamOverlay(
         val preview = PreviewView(context).apply {
             implementationMode = PreviewView.ImplementationMode.COMPATIBLE
             scaleType = PreviewView.ScaleType.FILL_CENTER
+            rotation = currentRotationDegrees
         }
         previewView = preview
         frame.addView(preview, FrameLayout.LayoutParams(
@@ -99,38 +102,56 @@ class FacecamOverlay(
             FrameLayout.LayoutParams.MATCH_PARENT
         ))
 
-        // Dedicated Touch Drag Overlay that leaves the close button clickable
+        // Center Drag Area that leaves buttons clickable
         val dragOverlay = View(context)
         frame.addView(dragOverlay, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.MATCH_PARENT
         ))
 
-        // Close Button
-        val closeBtnSize = (28 * density).toInt()
-        val closeBtn = ImageView(context).apply {
-            setImageResource(android.R.drawable.ic_menu_close_clear_cancel)
-            val p = (5 * density).toInt()
-            setPadding(p, p, p, p)
-            setColorFilter(Color.WHITE)
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(Color.parseColor("#CC141029"))
-                setStroke((1 * density).toInt(), Color.parseColor("#7F5AF0"))
-            }
-            elevation = 30f
-            isClickable = true
-            isFocusable = false
-            setOnClickListener {
-                remove()
-                onCloseClick()
-            }
+        val btnSize = (28 * density).toInt()
+
+        // 1. Close Button (Top-Right)
+        val closeBtn = createOverlayMiniButton(
+            iconRes = android.R.drawable.ic_menu_close_clear_cancel,
+            density = density
+        ) {
+            remove()
+            onCloseClick()
         }
-        val closeParams = FrameLayout.LayoutParams(closeBtnSize, closeBtnSize).apply {
+        val closeParams = FrameLayout.LayoutParams(btnSize, btnSize).apply {
             gravity = Gravity.TOP or Gravity.END
             setMargins(0, (8 * density).toInt(), (8 * density).toInt(), 0)
         }
         frame.addView(closeBtn, closeParams)
+
+        // 2. Rotate Button (Top-Left) - Rotates camera orientation 90 degrees on tap
+        val rotateBtn = createOverlayMiniButton(
+            iconRes = android.R.drawable.ic_menu_rotate,
+            density = density
+        ) {
+            currentRotationDegrees = (currentRotationDegrees + 90f) % 360f
+            previewView?.animate()?.rotation(currentRotationDegrees)?.setDuration(200)?.start()
+        }
+        val rotateParams = FrameLayout.LayoutParams(btnSize, btnSize).apply {
+            gravity = Gravity.TOP or Gravity.START
+            setMargins((8 * density).toInt(), (8 * density).toInt(), 0, 0)
+        }
+        frame.addView(rotateBtn, rotateParams)
+
+        // 3. Switch Camera Button (Bottom-Center) - Front / Back flip
+        val flipBtn = createOverlayMiniButton(
+            iconRes = android.R.drawable.ic_menu_camera,
+            density = density
+        ) {
+            isFrontCamera = !isFrontCamera
+            previewView?.let { bindCameraPreview(it) }
+        }
+        val flipParams = FrameLayout.LayoutParams(btnSize, btnSize).apply {
+            gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+            setMargins(0, 0, 0, (8 * density).toInt())
+        }
+        frame.addView(flipBtn, flipParams)
 
         // Dragging & Double-tap resizing strictly on dragOverlay
         var initialX = 0
@@ -164,7 +185,7 @@ class FacecamOverlay(
                 MotionEvent.ACTION_MOVE -> {
                     val dx = (event.rawX - initialTouchX).toInt()
                     val dy = (event.rawY - initialTouchY).toInt()
-                    if (abs(dx) > 5 || abs(dy) > 5) {
+                    if (abs(dx) > 4 || abs(dy) > 4) {
                         params.x = initialX + dx
                         params.y = initialY + dy
                         try {
@@ -187,10 +208,31 @@ class FacecamOverlay(
         }
     }
 
+    private fun createOverlayMiniButton(iconRes: Int, density: Float, onClick: () -> Unit): ImageView {
+        return ImageView(context).apply {
+            setImageResource(iconRes)
+            val p = (5 * density).toInt()
+            setPadding(p, p, p, p)
+            setColorFilter(Color.WHITE)
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.parseColor("#CC141029"))
+                setStroke((1 * density).toInt(), Color.parseColor("#7F5AF0"))
+            }
+            elevation = 32f
+            isClickable = true
+            isFocusable = false
+            setOnClickListener { onClick() }
+        }
+    }
+
     private fun startCamera(previewView: PreviewView) {
         lifecycleRegistry.currentState = Lifecycle.State.STARTED
         lifecycleRegistry.currentState = Lifecycle.State.RESUMED
+        bindCameraPreview(previewView)
+    }
 
+    private fun bindCameraPreview(previewView: PreviewView) {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
         cameraProviderFuture.addListener({
             try {
@@ -200,7 +242,13 @@ class FacecamOverlay(
                 }
 
                 val hasFront = cameraProvider?.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA) == true
-                val selector = if (hasFront) {
+                val hasBack = cameraProvider?.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA) == true
+
+                val selector = if (isFrontCamera && hasFront) {
+                    CameraSelector.DEFAULT_FRONT_CAMERA
+                } else if (!isFrontCamera && hasBack) {
+                    CameraSelector.DEFAULT_BACK_CAMERA
+                } else if (hasFront) {
                     CameraSelector.DEFAULT_FRONT_CAMERA
                 } else {
                     CameraSelector.DEFAULT_BACK_CAMERA

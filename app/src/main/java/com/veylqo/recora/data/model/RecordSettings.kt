@@ -8,6 +8,7 @@ enum class AudioSource(val displayName: String, val subtitle: String) {
 }
 
 enum class VideoResolution(val label: String, val pixels: String, val isPro: Boolean) {
+    Native("Native Display", "Screen 1:1 match", false),
     FHD("1080p FHD", "1920 × 1080", false),
     QHD("2K QHD", "2560 × 1440", true),
     UHD("4K UHD", "3840 × 2160", true)
@@ -33,7 +34,7 @@ enum class CountdownTimer(val displayName: String, val seconds: Int) {
 
 data class RecordUiState(
     val audioSource: AudioSource = AudioSource.Internal,
-    val resolution: VideoResolution = VideoResolution.FHD,
+    val resolution: VideoResolution = VideoResolution.Native,
     val fps: VideoFps = VideoFps.FPS_60,
     val orientation: VideoOrientation = VideoOrientation.Auto,
     val timer: CountdownTimer = CountdownTimer.Seconds3,

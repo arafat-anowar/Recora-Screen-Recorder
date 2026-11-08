@@ -37,6 +37,7 @@ fun QualityPickerSheet(
     selectedResolution: VideoResolution,
     selectedFps: VideoFps,
     isProUser: Boolean,
+    nativeResolutionText: String = "Screen 1:1 match",
     onSelectResolution: (VideoResolution) -> Unit,
     onSelectFps: (VideoFps) -> Unit,
     onShowPlan: () -> Unit,
@@ -60,9 +61,10 @@ fun QualityPickerSheet(
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 VideoResolution.entries.forEach { res ->
                     val isLocked = res.isPro && !isProUser
+                    val subtitleText = if (res == VideoResolution.Native) nativeResolutionText else res.pixels
                     SheetOptionItem(
                         title = res.label,
-                        subtitle = res.pixels,
+                        subtitle = subtitleText,
                         selected = selectedResolution == res,
                         badge = if (res.isPro) "PRO" else null,
                         badgeColor = ProGold,
