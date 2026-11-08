@@ -74,7 +74,9 @@ import com.veylqo.recora.ui.dialogs.OverlayPermissionDialog
 import com.veylqo.recora.ui.dialogs.RedeemCodeDialog
 import com.veylqo.recora.ui.dialogs.RenameDialog
 import com.veylqo.recora.ui.dialogs.TouchSetupDialog
+import com.veylqo.recora.editor.VideoEditorManager
 import com.veylqo.recora.ui.navigation.NavTab
+import com.veylqo.recora.ui.screens.editor.VideoEditorScreen
 import com.veylqo.recora.ui.screens.more.MoreScreen
 import com.veylqo.recora.ui.screens.record.CountdownScreen
 import com.veylqo.recora.ui.screens.record.RecordScreen
@@ -125,6 +127,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun RecoraApp(
     triggerRecordFromTile: Boolean = false,
@@ -174,6 +177,8 @@ fun RecoraApp(
     var selectedClipForMenu by remember { mutableStateOf<ClipItem?>(null) }
     var clipToDelete by remember { mutableStateOf<ClipItem?>(null) }
     var clipToRename by remember { mutableStateOf<ClipItem?>(null) }
+    var clipToEdit by remember { mutableStateOf<ClipItem?>(null) }
+    val videoEditorManager = remember { VideoEditorManager(context, mediaStoreRepo) }
 
     var showAudioSheet by remember { mutableStateOf(false) }
     var showQualitySheet by remember { mutableStateOf(false) }
@@ -423,7 +428,23 @@ fun RecoraApp(
         String.format(Locale.US, "%02d:%02d", min, sec)
     }
 
-    GalaxyBackground(reduceMotion = isRecording || !uiState.smoothAnimations) {
+    if (clipToEdit != null) {
+        VideoEditorScreen(
+            clip = clipToEdit!!,
+            editorManager = videoEditorManager,
+            onBackClick = { clipToEdit = null },
+            onExportSuccess = { outputUri, newTitle ->
+                clipToEdit = null
+                refreshRecordings()
+                currentTab = NavTab.Recordings
+                showToast("Exported: $newTitle")
+            },
+            onError = { err ->
+                showToast("Export error: $err")
+            }
+        )
+    } else {
+        GalaxyBackground(reduceMotion = isRecording || !uiState.smoothAnimations) {
         Box(modifier = Modifier.fillMaxSize()) {
             if (isCountingDown) {
                 CountdownScreen(
@@ -709,7 +730,9 @@ fun RecoraApp(
                             }
                         }
                     },
-                    onEditAndTrim = { showToast("Opening editor for: ${clip.title}") },
+                    onEditAndTrim = {
+                        clipToEdit = clip
+                    },
                     onShare = {
                         val uriStr = clip.uriString
                         if (uriStr != null) {
@@ -818,5 +841,6 @@ fun RecoraApp(
                 )
             }
         }
+    }
     }
 }
