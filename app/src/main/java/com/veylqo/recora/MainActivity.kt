@@ -207,6 +207,21 @@ fun RecoraApp() {
         )
     }
 
+    // Floating Countdown Overlay that displays over the mobile home screen!
+    val countdownOverlay = remember {
+        com.veylqo.recora.service.overlay.FloatingCountdownOverlay(context.applicationContext)
+    }
+
+    fun goToHomeScreen() {
+        try {
+            val homeIntent = Intent(Intent.ACTION_MAIN).apply {
+                addCategory(Intent.CATEGORY_HOME)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            context.startActivity(homeIntent)
+        } catch (e: Exception) {}
+    }
+
     // Observe activity lifecycle to sync touches setting and prevent window leaks
     androidx.compose.runtime.DisposableEffect(context) {
         val activity = context as? ComponentActivity
@@ -218,12 +233,23 @@ fun RecoraApp() {
                     false
                 }
                 uiState = uiState.copy(showTouches = touchesOn)
+
+                // Force refresh Quick Settings tile icon on Android 7.0+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    try {
+                        android.service.quicksettings.TileService.requestListeningState(
+                            context,
+                            ComponentName(context, RecoraTileService::class.java)
+                        )
+                    } catch (e: Exception) {}
+                }
             }
         }
         activity?.lifecycle?.addObserver(observer)
         onDispose {
             activity?.lifecycle?.removeObserver(observer)
             previewOverlayManager.removeAllOverlays()
+            countdownOverlay.remove()
         }
     }
 
@@ -298,11 +324,29 @@ fun RecoraApp() {
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK && result.data != null) {
+            val resCode = result.resultCode
+            val resData = result.data!!
+
             if (uiState.timer == CountdownTimer.Off) {
-                executeStartService(result.resultCode, result.data!!)
+                goToHomeScreen()
+                executeStartService(resCode, resData)
             } else {
-                pendingProjectionData = result.resultCode to result.data!!
-                isCountingDown = true
+                if (Settings.canDrawOverlays(context)) {
+                    // Minimize Recora to the mobile home screen and show floating countdown on top!
+                    goToHomeScreen()
+                    countdownOverlay.startCountdown(
+                        initialSeconds = uiState.timer.seconds,
+                        onComplete = {
+                            executeStartService(resCode, resData)
+                        },
+                        onCancel = {
+                            showToast("Recording cancelled")
+                        }
+                    )
+                } else {
+                    pendingProjectionData = resCode to resData
+                    isCountingDown = true
+                }
             }
         } else {
             showToast("Screen recording permission was cancelled")
@@ -353,6 +397,7 @@ fun RecoraApp() {
                     onCountdownComplete = {
                         isCountingDown = false
                         pendingProjectionData?.let { (code, data) ->
+                            goToHomeScreen()
                             executeStartService(code, data)
                         }
                         pendingProjectionData = null

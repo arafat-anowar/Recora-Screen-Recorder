@@ -48,7 +48,7 @@ data class RecordUiState(
     val bitrate: VideoBitrate = VideoBitrate.Auto,
     val orientation: VideoOrientation = VideoOrientation.Auto,
     val timer: CountdownTimer = CountdownTimer.Seconds3,
-    val floatingControls: Boolean = true,
+    val floatingControls: Boolean = false,
     val penAndTools: Boolean = false,
     val facecam: Boolean = false,
     val showTouches: Boolean = false,
