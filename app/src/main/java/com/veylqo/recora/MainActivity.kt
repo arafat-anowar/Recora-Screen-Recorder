@@ -359,8 +359,22 @@ fun RecoraApp(
                 goToHomeScreen()
                 executeStartService(resCode, resData)
             } else {
-                pendingProjectionData = resCode to resData
-                isCountingDown = true
+                if (Settings.canDrawOverlays(context)) {
+                    // Minimize Recora to the mobile home screen and show floating countdown on top!
+                    goToHomeScreen()
+                    countdownOverlay.startCountdown(
+                        initialSeconds = uiState.timer.seconds,
+                        onComplete = {
+                            executeStartService(resCode, resData)
+                        },
+                        onCancel = {
+                            showToast("Recording cancelled")
+                        }
+                    )
+                } else {
+                    pendingProjectionData = resCode to resData
+                    isCountingDown = true
+                }
             }
         } else {
             showToast("Screen recording permission was cancelled")

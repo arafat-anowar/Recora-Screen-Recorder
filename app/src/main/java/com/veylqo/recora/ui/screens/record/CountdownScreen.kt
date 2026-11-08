@@ -72,55 +72,55 @@ fun CountdownScreen(
     val displaySeconds = ceil(progressAnim.value * totalSeconds).toInt().coerceIn(1, totalSeconds)
     val clockFormat = String.format(Locale.US, "00:00:%02d", displaySeconds)
 
-    // Reference Image Palette: Vibrant glowing neon red & dimmed track
-    val neonRed = Color(0xFFFF2B54)
-    val dimTrackRed = Color(0x38FF2B54)
+    // App Signature Purple Theme Palette
+    val themePurple = Color(0xFF8B5CF6)
+    val dimTrackPurple = Color(0x388B5CF6)
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF06040A))
+            .background(Color(0xFF070514))
             .padding(horizontal = 24.dp)
             .padding(top = 48.dp, bottom = 48.dp)
     ) {
-        // Center: Circular Countdown Chronometer matching reference image
+        // Center: Circular Countdown Chronometer matching reference design in app theme
         Box(
             modifier = Modifier
-                .size(280.dp)
+                .size(230.dp)
                 .align(Alignment.Center)
                 .drawBehind {
                     val center = Offset(size.width / 2f, size.height / 2f)
-                    val strokeWidth = 11.dp.toPx()
-                    val radius = (size.minDimension - strokeWidth) / 2f - 10.dp.toPx()
+                    val strokeWidth = 9.dp.toPx()
+                    val radius = (size.minDimension - strokeWidth) / 2f - 8.dp.toPx()
 
                     // 1. Outer Soft Neon Glow (Multi-layer diffuse aura)
                     drawCircle(
-                        color = neonRed.copy(alpha = 0.12f),
+                        color = themePurple.copy(alpha = 0.12f),
                         radius = radius,
                         center = center,
-                        style = Stroke(width = strokeWidth + 24.dp.toPx())
+                        style = Stroke(width = strokeWidth + 20.dp.toPx())
                     )
                     drawCircle(
-                        color = neonRed.copy(alpha = 0.28f),
+                        color = themePurple.copy(alpha = 0.28f),
                         radius = radius,
                         center = center,
-                        style = Stroke(width = strokeWidth + 10.dp.toPx())
+                        style = Stroke(width = strokeWidth + 8.dp.toPx())
                     )
 
                     // 2. Full Background Dimmed Track
                     drawCircle(
-                        color = dimTrackRed,
+                        color = dimTrackPurple,
                         radius = radius,
                         center = center,
                         style = Stroke(width = strokeWidth)
                     )
 
-                    // 3. Active Glowing Red Arc (Depletes clockwise from 12 o'clock)
+                    // 3. Active Glowing Purple Arc (Depletes clockwise from 12 o'clock)
                     val sweepAngle = 360f * progressAnim.value
                     val startAngle = -90f + (360f * (1f - progressAnim.value))
 
                     drawArc(
-                        color = neonRed,
+                        color = themePurple,
                         startAngle = startAngle,
                         sweepAngle = sweepAngle,
                         useCenter = false,
