@@ -16,9 +16,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import com.veylqo.recora.ui.theme.BgDarkNavyBottom
 import com.veylqo.recora.ui.theme.BgDarkNavyCenter
@@ -28,8 +30,8 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 private data class PolarStar(
-    val radiusFraction: Float, // Distance from galactic center
-    val angleRad: Float,       // Polar angle
+    val radiusFraction: Float,
+    val angleRad: Float,
     val size: Float,
     val baseAlpha: Float,
     val twinkleSpeed: Float,
@@ -239,7 +241,120 @@ fun GalaxyBackground(
                         }
                     }
 
-                    // (C) Rotating Starfield (Stars revolve around the core in real-time)
+                    // (C) LUMINOUS CONCENTRIC GALAXY CIRCLES & ORBITAL RINGS
+                    val ring1R = baseRadius * 0.38f
+                    val ring2R = baseRadius * 0.58f
+                    val ring3R = baseRadius * 0.82f
+                    val ring4R = baseRadius * 1.10f
+
+                    // Ring 1: Inner Glowing Celestial Orbit Circle
+                    drawCircle(
+                        color = Color(0xFF8B5CF6).copy(alpha = 0.22f),
+                        radius = ring1R,
+                        center = core,
+                        style = Stroke(width = 1.8f)
+                    )
+
+                    // Ring 2: Mid Galaxy Orbit Circle
+                    drawCircle(
+                        color = Color(0xFFEC4899).copy(alpha = 0.18f),
+                        radius = ring2R,
+                        center = core,
+                        style = Stroke(width = 1.4f)
+                    )
+
+                    // Ring 3: Outer Galaxy Belt Circle
+                    drawCircle(
+                        color = Color(0xFF38BDF8).copy(alpha = 0.16f),
+                        radius = ring3R,
+                        center = core,
+                        style = Stroke(width = 1.6f)
+                    )
+
+                    // Ring 4: Far Cosmic Halo Circle
+                    drawCircle(
+                        color = Color(0xFFA78BFA).copy(alpha = 0.11f),
+                        radius = ring4R,
+                        center = core,
+                        style = Stroke(width = 1.2f)
+                    )
+
+                    // Tilted 3D Elliptical Galaxy Ring (Saturn / Milky Way Disc Circle)
+                    val ovalWidth = baseRadius * 1.70f
+                    val ovalHeight = baseRadius * 0.65f
+                    val ovalTopLeft = Offset(core.x - ovalWidth * 0.5f, core.y - ovalHeight * 0.5f)
+
+                    drawOval(
+                        brush = Brush.sweepGradient(
+                            colors = listOf(
+                                Color(0xFF8B5CF6).copy(alpha = 0.30f),
+                                Color(0xFFEC4899).copy(alpha = 0.24f),
+                                Color(0xFF38BDF8).copy(alpha = 0.20f),
+                                Color(0xFF8B5CF6).copy(alpha = 0.08f),
+                                Color(0xFF8B5CF6).copy(alpha = 0.30f)
+                            ),
+                            center = core
+                        ),
+                        topLeft = ovalTopLeft,
+                        size = Size(ovalWidth, ovalHeight),
+                        style = Stroke(width = 2.2f)
+                    )
+
+                    // Secondary Tilted Orbit Circle
+                    val oval2Width = baseRadius * 1.30f
+                    val oval2Height = baseRadius * 0.50f
+                    val oval2TopLeft = Offset(core.x - oval2Width * 0.5f, core.y - oval2Height * 0.5f)
+
+                    drawOval(
+                        color = Color(0xFFC084FC).copy(alpha = 0.18f),
+                        topLeft = oval2TopLeft,
+                        size = Size(oval2Width, oval2Height),
+                        style = Stroke(width = 1.4f)
+                    )
+
+                    // (D) Glowing Orbital Marker Beads orbiting on the circles
+                    if (!reduceMotion) {
+                        // Pearl on Ring 1
+                        val bead1Ang = (galaxyRotation * 1.3f * (PI / 180.0)).toFloat()
+                        drawCircle(
+                            color = Color(0xFFEC4899),
+                            radius = 4.0f,
+                            center = Offset(core.x + ring1R * cos(bead1Ang), core.y + ring1R * sin(bead1Ang))
+                        )
+                        drawCircle(
+                            color = Color(0xFFEC4899).copy(alpha = 0.35f),
+                            radius = 9.0f,
+                            center = Offset(core.x + ring1R * cos(bead1Ang), core.y + ring1R * sin(bead1Ang))
+                        )
+
+                        // Pearl on Ring 2
+                        val bead2Ang = (galaxyRotation * 0.9f * (PI / 180.0) + 2.1).toFloat()
+                        drawCircle(
+                            color = Color(0xFF38BDF8),
+                            radius = 3.5f,
+                            center = Offset(core.x + ring2R * cos(bead2Ang), core.y + ring2R * sin(bead2Ang))
+                        )
+                        drawCircle(
+                            color = Color(0xFF38BDF8).copy(alpha = 0.30f),
+                            radius = 8.0f,
+                            center = Offset(core.x + ring2R * cos(bead2Ang), core.y + ring2R * sin(bead2Ang))
+                        )
+
+                        // Pearl on Ring 3
+                        val bead3Ang = (galaxyRotation * 0.7f * (PI / 180.0) + 4.2).toFloat()
+                        drawCircle(
+                            color = Color(0xFFFFD21F),
+                            radius = 3.8f,
+                            center = Offset(core.x + ring3R * cos(bead3Ang), core.y + ring3R * sin(bead3Ang))
+                        )
+                        drawCircle(
+                            color = Color(0xFFFFD21F).copy(alpha = 0.35f),
+                            radius = 8.5f,
+                            center = Offset(core.x + ring3R * cos(bead3Ang), core.y + ring3R * sin(bead3Ang))
+                        )
+                    }
+
+                    // (E) Rotating Starfield (Stars revolve around the core in real-time)
                     val timeSec = galaxyRotation * 0.1f
                     for (star in spiralStars) {
                         val dist = star.radiusFraction * baseRadius
@@ -269,7 +384,7 @@ fun GalaxyBackground(
                         }
                     }
 
-                    // (D) Orbiting Luminous Cosmic Dust Particles
+                    // (F) Orbiting Luminous Cosmic Dust Particles
                     if (!reduceMotion) {
                         for (dust in orbitingDust) {
                             val dustDist = dust.orbitRadiusFraction * baseRadius
