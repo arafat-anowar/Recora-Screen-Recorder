@@ -63,47 +63,60 @@ fun GalaxyBackground(
         list
     }
 
-    val infiniteTransition = rememberInfiniteTransition(label = "GalaxyMotion")
+    val nebulaPulse1: Float
+    val nebulaPulse2: Float
+    val twinkleAlpha1: Float
+    val twinkleAlpha2: Float
 
-    val nebulaPulse1 by infiniteTransition.animateFloat(
-        initialValue = 0.06f,
-        targetValue = if (reduceMotion) 0.06f else 0.12f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 8000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "Nebula1"
-    )
-
-    val nebulaPulse2 by infiniteTransition.animateFloat(
-        initialValue = 0.05f,
-        targetValue = if (reduceMotion) 0.05f else 0.10f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 11000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "Nebula2"
-    )
-
-    val twinkleAlpha1 by infiniteTransition.animateFloat(
-        initialValue = 0.3f,
-        targetValue = if (reduceMotion) 0.3f else 0.85f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 4000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "Twinkle1"
-    )
-
-    val twinkleAlpha2 by infiniteTransition.animateFloat(
-        initialValue = 0.8f,
-        targetValue = if (reduceMotion) 0.8f else 0.25f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 5500, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "Twinkle2"
-    )
+    if (reduceMotion) {
+        // High performance mode: zero GPU animation redraw overhead!
+        nebulaPulse1 = 0.08f
+        nebulaPulse2 = 0.06f
+        twinkleAlpha1 = 0.4f
+        twinkleAlpha2 = 0.6f
+    } else {
+        val infiniteTransition = rememberInfiniteTransition(label = "GalaxyMotion")
+        val p1 by infiniteTransition.animateFloat(
+            initialValue = 0.06f,
+            targetValue = 0.12f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 8000, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "Nebula1"
+        )
+        val p2 by infiniteTransition.animateFloat(
+            initialValue = 0.05f,
+            targetValue = 0.10f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 11000, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "Nebula2"
+        )
+        val t1 by infiniteTransition.animateFloat(
+            initialValue = 0.3f,
+            targetValue = 0.85f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 4000, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "Twinkle1"
+        )
+        val t2 by infiniteTransition.animateFloat(
+            initialValue = 0.8f,
+            targetValue = 0.25f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 5500, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "Twinkle2"
+        )
+        nebulaPulse1 = p1
+        nebulaPulse2 = p2
+        twinkleAlpha1 = t1
+        twinkleAlpha2 = t2
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
         Canvas(modifier = Modifier.fillMaxSize()) {

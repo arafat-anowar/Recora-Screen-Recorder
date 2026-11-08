@@ -27,54 +27,72 @@ object DeviceCodecInfo {
         val preferredMime = if (preferHevc) MediaFormat.MIMETYPE_VIDEO_HEVC else MediaFormat.MIMETYPE_VIDEO_AVC
         val codec = findEncoderForMime(preferredMime) ?: findEncoderForMime(MediaFormat.MIMETYPE_VIDEO_AVC)
 
+        // Align dimensions to 8 for hardware encoder compatibility
+        val alignedW = (requestedWidth / 8) * 8
+        val alignedH = (requestedHeight / 8) * 8
+
         if (codec == null) {
-            Log.w(TAG, "No hardware video encoder found for H.264/HEVC, using safe 1080p fallback")
+            Log.w(TAG, "No hardware video encoder found for H.264/HEVC, using aligned bounds")
             return RecordingProfile(
-                width = 1080,
-                height = 1920,
-                fps = 30,
-                bitrate = 8_000_000,
-                mimeType = MediaFormat.MIMETYPE_VIDEO_AVC,
-                isFallback = true,
-                fallbackReason = "No compatible hardware encoder found"
+                width = alignedW,
+                height = alignedH,
+                fps = requestedFps,
+                bitrate = calculateTargetBitrate(alignedW, alignedH, requestedFps),
+                mimeType = MediaFormat.MIMETYPE_VIDEO_AVC
             )
         }
 
-        val capabilities = codec.getCapabilitiesForType(codec.supportedTypes.firstOrNull { it.contains("video", ignoreCase = true) } ?: MediaFormat.MIMETYPE_VIDEO_AVC)
+        val capabilities = codec.getCapabilitiesForType(
+            codec.supportedTypes.firstOrNull { it.contains("video", ignoreCase = true) } ?: MediaFormat.MIMETYPE_VIDEO_AVC
+        )
         val videoCaps = capabilities.videoCapabilities
 
-        // Check if requested resolution is supported
-        val isSizeSupported = videoCaps?.isSizeSupported(requestedWidth, requestedHeight) == true
-        val isRateSupported = if (isSizeSupported && videoCaps != null) {
-            val range = videoCaps.getSupportedFrameRatesFor(requestedWidth, requestedHeight)
-            range != null && range.contains(requestedFps.toDouble())
-        } else false
+        // Check hardware size capabilities: handles portrait & landscape aspect ratios gracefully
+        val minDim = minOf(alignedW, alignedH)
+        val maxDim = maxOf(alignedW, alignedH)
 
-        return if (isSizeSupported && isRateSupported) {
-            val bitrate = calculateTargetBitrate(requestedWidth, requestedHeight, requestedFps)
+        val maxWidth = videoCaps?.supportedWidths?.upper ?: 3840
+        val maxHeight = videoCaps?.supportedHeights?.upper ?: 2560
+
+        // In Android, hardware encoders support (minDim x maxDim) or (maxDim x minDim) as macroblocks
+        val isHardwareSizeOk = videoCaps != null && (
+            videoCaps.isSizeSupported(alignedW, alignedH) ||
+            videoCaps.isSizeSupported(alignedH, alignedW) ||
+            (minDim <= maxWidth && maxDim <= maxHeight)
+        )
+
+        val targetFps = if (videoCaps != null && videoCaps.supportedFrameRates.contains(requestedFps)) {
+            requestedFps
+        } else {
+            30
+        }
+
+        return if (isHardwareSizeOk) {
+            val bitrate = calculateTargetBitrate(alignedW, alignedH, targetFps)
+            Log.i(TAG, "Hardware encoder validated for Native $alignedW x $alignedH @ ${targetFps}fps ($bitrate bps)")
             RecordingProfile(
-                width = requestedWidth,
-                height = requestedHeight,
-                fps = requestedFps,
+                width = alignedW,
+                height = alignedH,
+                fps = targetFps,
                 bitrate = bitrate,
                 mimeType = capabilities.mimeType ?: MediaFormat.MIMETYPE_VIDEO_AVC
             )
         } else {
-            // Automatic fallback to 1080p @ 60 or 30
+            // Safe fallback preserving aspect ratio rather than forcing 16:9
             val fallbackW = 1080
-            val fallbackH = 1920
-            val fallbackFps = if (videoCaps?.getSupportedFrameRatesFor(fallbackW, fallbackH)?.contains(60.0) == true) 60 else 30
-            val bitrate = calculateTargetBitrate(fallbackW, fallbackH, fallbackFps)
+            val aspectRatio = requestedHeight.toFloat() / requestedWidth.toFloat()
+            val fallbackH = ((fallbackW * aspectRatio).toInt() / 8) * 8
+            val bitrate = calculateTargetBitrate(fallbackW, fallbackH, 30)
 
-            Log.i(TAG, "Device does not support ${requestedWidth}x$requestedHeight @ $requestedFps fps. Falling back to ${fallbackW}x$fallbackH @ $fallbackFps fps")
+            Log.i(TAG, "Falling back to safe bounds $fallbackW x $fallbackH @ 30fps")
             RecordingProfile(
                 width = fallbackW,
                 height = fallbackH,
-                fps = fallbackFps,
+                fps = 30,
                 bitrate = bitrate,
                 mimeType = capabilities.mimeType ?: MediaFormat.MIMETYPE_VIDEO_AVC,
                 isFallback = true,
-                fallbackReason = "Hardware encoder limit: max ${videoCaps?.supportedWidths?.upper}x${videoCaps?.supportedHeights?.upper}"
+                fallbackReason = "Hardware encoder limit"
             )
         }
     }
@@ -110,8 +128,8 @@ object DeviceCodecInfo {
 
         sb.appendLine()
         sb.appendLine("Audio Capabilities:")
-        sb.appendLine("• Internal Audio (Android 10+ AudioPlaybackCapture)")
-        sb.appendLine("• AAC Stereo @ 48kHz, 192kbps")
+        sb.appendLine("• Pure Internal Audio (Android 10+ AudioPlaybackCapture)")
+        sb.appendLine("• AAC Stereo @ 44.1kHz, 192kbps")
         return sb.toString().trimEnd()
     }
 
@@ -132,8 +150,8 @@ object DeviceCodecInfo {
     private fun calculateTargetBitrate(w: Int, h: Int, fps: Int): Int {
         val pixels = w.toLong() * h.toLong()
         return when {
-            pixels >= 3840 * 2160 -> if (fps >= 60) 40_000_000 else 25_000_000
-            pixels >= 2560 * 1440 -> if (fps >= 60) 24_000_000 else 16_000_000
+            pixels >= 3840 * 2160 -> if (fps >= 60) 28_000_000 else 20_000_000
+            pixels >= 2560 * 1440 -> if (fps >= 60) 20_000_000 else 14_000_000
             pixels >= 1920 * 1080 -> if (fps >= 60) 14_000_000 else 10_000_000
             else -> 6_000_000
         }

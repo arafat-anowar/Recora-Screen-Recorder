@@ -82,6 +82,16 @@ fun GlassNavBar(
                 }
 
                 val interactionSource = remember { MutableInteractionSource() }
+                val pillBg by animateColorAsState(
+                    targetValue = if (isSelected) PrimaryPurple else Color.Transparent,
+                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                    label = "NavPillBg"
+                )
+                val pillScale by androidx.compose.animation.core.animateFloatAsState(
+                    targetValue = if (isSelected) 1.0f else 0.90f,
+                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                    label = "NavPillScale"
+                )
 
                 Column(
                     modifier = Modifier
@@ -100,14 +110,14 @@ fun GlassNavBar(
                             .height(34.dp)
                             .width(58.dp)
                             .clip(CircleShape)
-                            .background(if (isSelected) PrimaryPurple else Color.Transparent),
+                            .background(pillBg),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = icon,
                             contentDescription = tab.title,
                             tint = if (isSelected) Color.White else TextMuted,
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size((22 * pillScale).dp)
                         )
                     }
 

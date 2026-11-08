@@ -4,14 +4,19 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -265,10 +270,18 @@ fun RecordScreen(
                     .border(1.dp, PrimaryPurple.copy(alpha = 0.08f), CircleShape)
             )
 
+            val recordInteractionSource = remember { MutableInteractionSource() }
+            val isRecordPressed by recordInteractionSource.collectIsPressedAsState()
+            val buttonPressScale by animateFloatAsState(
+                targetValue = if (isRecordPressed) 0.93f else pulseScale,
+                animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                label = "ButtonPressScale"
+            )
+
             // Large Purple Outer Circle Button
             Box(
                 modifier = Modifier
-                    .scale(pulseScale)
+                    .scale(buttonPressScale)
                     .size(140.dp)
                     .shadow(
                         elevation = 30.dp,
@@ -279,7 +292,7 @@ fun RecordScreen(
                     .clip(CircleShape)
                     .background(PrimaryPurple)
                     .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
+                        interactionSource = recordInteractionSource,
                         indication = null
                     ) { onStartRecordingClick() },
                 contentAlignment = Alignment.Center
@@ -441,13 +454,25 @@ private fun SettingGridCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val cardScale by animateFloatAsState(
+        targetValue = if (isPressed) 0.95f else 1.0f,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "CardPressScale"
+    )
+
     Box(
         modifier = modifier
+            .graphicsLayer {
+                scaleX = cardScale
+                scaleY = cardScale
+            }
             .height(72.dp)
             .clip(RoundedCornerShape(18.dp))
             .background(CardBg)
             .border(1.dp, CardBorder, RoundedCornerShape(18.dp))
-            .clickable { onClick() }
+            .clickable(interactionSource = interactionSource, indication = null) { onClick() }
             .padding(horizontal = 12.dp, vertical = 10.dp),
         contentAlignment = Alignment.CenterStart
     ) {
@@ -505,22 +530,35 @@ private fun QuickTogglePill(
     onToggle: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val pillScale by animateFloatAsState(
+        targetValue = if (isPressed) 0.94f else (if (checked) 1.02f else 1.0f),
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "PillScale"
+    )
     val borderColor by animateColorAsState(
         targetValue = if (checked) PrimaryPurple else CardBorder,
+        animationSpec = tween(220),
         label = "PillBorder"
     )
     val bgColor by animateColorAsState(
-        targetValue = if (checked) PrimaryPurple.copy(alpha = 0.15f) else CardBg,
+        targetValue = if (checked) PrimaryPurple.copy(alpha = 0.18f) else CardBg,
+        animationSpec = tween(220),
         label = "PillBg"
     )
 
     Box(
         modifier = modifier
+            .graphicsLayer {
+                scaleX = pillScale
+                scaleY = pillScale
+            }
             .height(46.dp)
             .clip(RoundedCornerShape(PillCornerRadius))
             .background(bgColor)
             .border(1.dp, borderColor, RoundedCornerShape(PillCornerRadius))
-            .clickable { onToggle(!checked) }
+            .clickable(interactionSource = interactionSource, indication = null) { onToggle(!checked) }
             .padding(horizontal = 12.dp),
         contentAlignment = Alignment.Center
     ) {

@@ -19,6 +19,7 @@ import android.media.projection.MediaProjectionManager
 import android.net.Uri
 import android.os.Build
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.IBinder
 import android.os.Looper
 import android.os.ParcelFileDescriptor
@@ -31,6 +32,7 @@ import com.veylqo.recora.MainActivity
 import com.veylqo.recora.R
 import com.veylqo.recora.data.model.AudioSource
 import com.veylqo.recora.data.storage.MediaStoreRepository
+import com.veylqo.recora.service.audio.InternalAudioRecorder
 import com.veylqo.recora.service.encoder.DeviceCodecInfo
 import com.veylqo.recora.service.encoder.RecordingProfile
 import kotlinx.coroutines.CoroutineScope
@@ -96,6 +98,13 @@ class RecordingService : Service() {
     private var isPaused = false
     private var durationSeconds = 0
     private var timerJob: Job? = null
+
+    // Pure Internal Audio & Performance Optimization components
+    private val internalAudioRecorder = InternalAudioRecorder()
+    private var isInternalAudio = false
+    private var tempVideoFile: java.io.File? = null
+    private var tempAudioFile: java.io.File? = null
+    private var recorderThread: HandlerThread? = null
 
     private var audioLabel: String = "Internal audio"
     private var qualityLabel: String = "1080p FHD · 60fps"
@@ -223,16 +232,20 @@ class RecordingService : Service() {
                 }
                 mediaProjection = projection
 
-                // 5. Register MediaProjection Callback BEFORE virtual display creation
+                // 5. Establish dedicated background looper thread to completely eliminate UI / compositor lag
+                val thread = HandlerThread("RecoraRecorderThread").apply { start() }
+                recorderThread = thread
+                val bgHandler = Handler(thread.looper)
+
                 projection.registerCallback(object : MediaProjection.Callback() {
                     override fun onStop() {
                         super.onStop()
                         Log.i(TAG, "MediaProjection session stopped by system")
                         stopRecordingSession()
                     }
-                }, Handler(Looper.getMainLooper()))
+                }, bgHandler)
 
-                // 6. Configure MediaRecorder
+                // 6. Configure MediaRecorder & Audio capture
                 val recorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     MediaRecorder(this@RecordingService)
                 } else {
@@ -240,45 +253,58 @@ class RecordingService : Service() {
                     MediaRecorder()
                 }
 
-                // Audio source configuration
                 val hasAudio = audioSource != AudioSource.None
-                if (hasAudio) {
-                    if (audioSource == AudioSource.Internal || audioSource == AudioSource.InternalAndMic) {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                            try {
-                                val config = AudioPlaybackCaptureConfiguration.Builder(projection)
-                                    .addMatchingUsage(AudioAttributes.USAGE_MEDIA)
-                                    .addMatchingUsage(AudioAttributes.USAGE_GAME)
-                                    .addMatchingUsage(AudioAttributes.USAGE_UNKNOWN)
-                                    .build()
-                                Log.i(TAG, "Configured AudioPlaybackCaptureConfiguration for internal playback")
-                            } catch (e: Exception) {
-                                Log.w(TAG, "AudioPlaybackCapture not supported, using standard capture", e)
-                            }
-                        }
+                isInternalAudio = (audioSource == AudioSource.Internal || audioSource == AudioSource.InternalAndMic) &&
+                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+
+                if (isInternalAudio) {
+                    // PURE INTERNAL AUDIO: Record video ONLY with MediaRecorder, leaving microphone powered off!
+                    val vFile = java.io.File(cacheDir, "recora_temp_video.mp4")
+                    val aFile = java.io.File(cacheDir, "recora_temp_audio.m4a")
+                    tempVideoFile = vFile
+                    tempAudioFile = aFile
+
+                    recorder.setVideoSource(MediaRecorder.VideoSource.SURFACE)
+                    recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+                    recorder.setOutputFile(vFile.absolutePath)
+                    recorder.setVideoSize(profile.width, profile.height)
+                    recorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264)
+                    val finalBitrate = if (reqBitrate > 0) reqBitrate else profile.bitrate
+                    recorder.setVideoEncodingBitRate(finalBitrate)
+                    recorder.setVideoFrameRate(profile.fps)
+                    recorder.prepare()
+
+                    // Start background pure internal audio recorder
+                    val startedAudio = internalAudioRecorder.start(
+                        mediaProjection = projection,
+                        outputFile = aFile,
+                        includeMic = (audioSource == AudioSource.InternalAndMic)
+                    )
+                    Log.i(TAG, "Started Pure Internal Audio recording: $startedAudio")
+                } else {
+                    if (audioSource == AudioSource.Mic) {
+                        recorder.setAudioSource(MediaRecorder.AudioSource.MIC)
                     }
-                    recorder.setAudioSource(MediaRecorder.AudioSource.MIC)
+                    recorder.setVideoSource(MediaRecorder.VideoSource.SURFACE)
+                    recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+                    recorder.setOutputFile(fileDescriptor!!.fileDescriptor)
+                    recorder.setVideoSize(profile.width, profile.height)
+                    recorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264)
+                    val finalBitrate = if (reqBitrate > 0) reqBitrate else profile.bitrate
+                    recorder.setVideoEncodingBitRate(finalBitrate)
+                    recorder.setVideoFrameRate(profile.fps)
+
+                    if (audioSource == AudioSource.Mic) {
+                        recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+                        recorder.setAudioSamplingRate(44100)
+                        recorder.setAudioEncodingBitRate(192000)
+                    }
+                    recorder.prepare()
                 }
 
-                recorder.setVideoSource(MediaRecorder.VideoSource.SURFACE)
-                recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-                recorder.setOutputFile(fileDescriptor!!.fileDescriptor)
-                recorder.setVideoSize(profile.width, profile.height)
-                recorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264)
-                val finalBitrate = if (reqBitrate > 0) reqBitrate else profile.bitrate
-                recorder.setVideoEncodingBitRate(finalBitrate)
-                recorder.setVideoFrameRate(profile.fps)
-
-                if (hasAudio) {
-                    recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-                    recorder.setAudioSamplingRate(48000)
-                    recorder.setAudioEncodingBitRate(192000)
-                }
-
-                recorder.prepare()
                 mediaRecorder = recorder
 
-                // 7. Create Virtual Display
+                // 7. Create Virtual Display on background HandlerThread to prevent screen lag
                 val windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
                 val metrics = DisplayMetrics()
                 @Suppress("DEPRECATION")
@@ -292,7 +318,7 @@ class RecordingService : Service() {
                     DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
                     recorder.surface,
                     null,
-                    null
+                    bgHandler
                 )
 
                 // 8. Start recording
@@ -361,6 +387,29 @@ class RecordingService : Service() {
             val totalSeconds = durationSeconds
             val savedUri = currentOutputUri
             val savedName = currentFileName
+
+            // If pure internal audio was recorded, merge video and audio tracks
+            if (isInternalAudio) {
+                internalAudioRecorder.stop()
+                try { mediaRecorder?.stop() } catch (e: Exception) {}
+                try {
+                    mediaRecorder?.reset()
+                    mediaRecorder?.release()
+                    mediaRecorder = null
+                } catch (e: Exception) {}
+
+                val vFile = tempVideoFile
+                val aFile = tempAudioFile
+                val pfd = fileDescriptor
+                if (vFile != null && aFile != null && pfd != null) {
+                    internalAudioRecorder.mergeVideoAndAudio(vFile, aFile, pfd.fileDescriptor)
+                }
+                try { vFile?.delete() } catch (e: Exception) {}
+                try { aFile?.delete() } catch (e: Exception) {}
+                tempVideoFile = null
+                tempAudioFile = null
+                isInternalAudio = false
+            }
 
             cleanUp()
             stopForeground(STOP_FOREGROUND_REMOVE)
@@ -563,6 +612,15 @@ class RecordingService : Service() {
         } catch (e: Exception) {
             Log.e(TAG, "Error closing FileDescriptor", e)
         }
+
+        try {
+            internalAudioRecorder.stop()
+        } catch (e: Exception) {}
+
+        try {
+            recorderThread?.quitSafely()
+            recorderThread = null
+        } catch (e: Exception) {}
 
         try {
             mediaProjection?.stop()

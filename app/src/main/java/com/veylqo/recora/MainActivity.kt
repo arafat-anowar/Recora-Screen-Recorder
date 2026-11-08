@@ -18,11 +18,16 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -390,7 +395,7 @@ fun RecoraApp() {
         String.format(Locale.US, "%02d:%02d", min, sec)
     }
 
-    GalaxyBackground(reduceMotion = !uiState.smoothAnimations) {
+    GalaxyBackground(reduceMotion = isRecording || !uiState.smoothAnimations) {
         Box(modifier = Modifier.fillMaxSize()) {
             if (isCountingDown) {
                 CountdownScreen(
@@ -411,7 +416,20 @@ fun RecoraApp() {
                 )
             } else {
                 Box(modifier = Modifier.fillMaxSize()) {
-                    when (currentTab) {
+                    AnimatedContent(
+                        targetState = currentTab,
+                        transitionSpec = {
+                            if (targetState.ordinal > initialState.ordinal) {
+                                (slideInHorizontally { width -> (width * 0.12f).toInt() } + fadeIn(tween(220)))
+                                    .togetherWith(slideOutHorizontally { width -> (-width * 0.12f).toInt() } + fadeOut(tween(180)))
+                            } else {
+                                (slideInHorizontally { width -> (-width * 0.12f).toInt() } + fadeIn(tween(220)))
+                                    .togetherWith(slideOutHorizontally { width -> (width * 0.12f).toInt() } + fadeOut(tween(180)))
+                            }
+                        },
+                        label = "TabContentAnimation"
+                    ) { tab ->
+                        when (tab) {
                         NavTab.Record -> {
                             RecordScreen(
                                 state = uiState,
@@ -555,8 +573,9 @@ fun RecoraApp() {
                             )
                         }
                     }
+                }
 
-                    // Floating Glass Bottom Navigation Bar
+                // Floating Glass Bottom Navigation Bar
                     GlassNavBar(
                         selectedTab = currentTab,
                         onTabSelected = { currentTab = it },
