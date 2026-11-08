@@ -19,6 +19,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
@@ -29,21 +30,43 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
-private data class PolarStar(
+/**
+ * High-precision celestial star with astronomical brightness, realistic color temperature,
+ * scintillation twinkling, and optional 4-point James Webb diamond diffraction spikes.
+ */
+private data class CosmicStar(
     val radiusFraction: Float,
     val angleRad: Float,
     val size: Float,
     val baseAlpha: Float,
     val twinkleSpeed: Float,
-    val phase: Float
+    val phase: Float,
+    val color: Color,
+    val hasSpike: Boolean = false,
+    val spikeLength: Float = 0f
 )
 
-private data class OrbitingDust(
-    val orbitRadiusFraction: Float,
-    val baseAngleRad: Float,
-    val angularSpeedMultiplier: Float,
-    val size: Float,
+/**
+ * Luminous wisp node along galactic spiral arms
+ */
+private data class SpiralNebulaNode(
+    val radiusFraction: Float,
+    val angleRad: Float,
+    val sizeFraction: Float,
     val color: Color
+)
+
+/**
+ * Celestial orb traveling along luminous galaxy orbital circles
+ */
+private data class OrbitingGem(
+    val orbitRadiusFraction: Float,
+    val speedMultiplier: Float,
+    val initialAngleRad: Float,
+    val coreColor: Color,
+    val glowColor: Color,
+    val coreRadius: Float,
+    val glowRadius: Float
 )
 
 @Composable
@@ -52,104 +75,206 @@ fun GalaxyBackground(
     reduceMotion: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    // Generate rotating spiral starfield clustered around the galactic core
-    val spiralStars = remember {
-        val list = mutableListOf<PolarStar>()
-        val starData = listOf(
-            // Inner Core Stars
-            Triple(0.08f, 0.2f, 1.6f), Triple(0.12f, 1.4f, 2.0f), Triple(0.15f, 2.8f, 1.8f),
-            Triple(0.18f, 4.2f, 1.5f), Triple(0.20f, 5.6f, 2.2f), Triple(0.22f, 0.9f, 1.9f),
-            // Spiral Arm 1 (Purple Arm)
-            Triple(0.25f, 0.4f, 1.7f), Triple(0.32f, 0.9f, 2.2f), Triple(0.40f, 1.5f, 1.6f),
-            Triple(0.48f, 2.1f, 2.4f), Triple(0.56f, 2.7f, 1.8f), Triple(0.65f, 3.2f, 2.0f),
-            Triple(0.74f, 3.8f, 1.5f), Triple(0.85f, 4.3f, 1.9f), Triple(0.95f, 4.9f, 1.6f),
-            // Spiral Arm 2 (Pink Aurora Arm)
-            Triple(0.26f, 2.5f, 1.8f), Triple(0.34f, 3.0f, 2.1f), Triple(0.42f, 3.6f, 1.5f),
-            Triple(0.50f, 4.2f, 2.3f), Triple(0.58f, 4.8f, 1.7f), Triple(0.68f, 5.3f, 2.1f),
-            Triple(0.76f, 5.9f, 1.6f), Triple(0.88f, 0.3f, 1.8f), Triple(0.98f, 0.8f, 1.5f),
-            // Spiral Arm 3 (Cyan/Cosmic Blue Arm)
-            Triple(0.27f, 4.6f, 1.9f), Triple(0.35f, 5.1f, 2.2f), Triple(0.44f, 5.7f, 1.6f),
-            Triple(0.52f, 6.3f, 2.4f), Triple(0.60f, 0.6f, 1.8f), Triple(0.70f, 1.2f, 2.0f),
-            Triple(0.78f, 1.7f, 1.5f), Triple(0.90f, 2.2f, 1.9f), Triple(1.02f, 2.8f, 1.7f),
-            // Outer Halo Stars
-            Triple(0.82f, 1.1f, 1.4f), Triple(0.92f, 3.5f, 1.6f), Triple(1.05f, 5.2f, 1.3f),
-            Triple(1.10f, 2.0f, 1.5f), Triple(1.15f, 4.0f, 1.8f), Triple(1.20f, 0.5f, 1.4f)
+    // 1. GENERATE DEEP MULTI-LAYERED CELESTIAL STARFIELD (Zero runtime garbage)
+    val cosmicStars = remember {
+        val list = mutableListOf<CosmicStar>()
+
+        val starColors = listOf(
+            Color(0xFFFFFFFF), // Pure Diamond White
+            Color(0xFFBAE6FD), // Icy Blue
+            Color(0xFFDDD6FE), // Soft Lavender
+            Color(0xFFFDE68A), // Solar Gold
+            Color(0xFFFBCFE8)  // Rose Nebula
         )
 
-        starData.forEachIndexed { index, (dist, angle, sz) ->
+        // Tier A: Micro Deep-Space Dust Stars (~45 stars)
+        for (i in 0 until 45) {
+            val dist = 0.08f + (i * 0.026f)
+            val ang = ((i * 137.508) * (PI / 180.0)).toFloat() // Golden ratio angle distribution
             list.add(
-                PolarStar(
+                CosmicStar(
                     radiusFraction = dist,
-                    angleRad = angle,
-                    size = sz,
-                    baseAlpha = 0.40f + ((index % 3) * 0.15f),
-                    twinkleSpeed = 0.9f + ((index % 4) * 0.35f),
-                    phase = (index * 0.68f) % (2f * PI.toFloat())
+                    angleRad = ang,
+                    size = 1.0f + (i % 3) * 0.35f,
+                    baseAlpha = 0.28f + (i % 5) * 0.10f,
+                    twinkleSpeed = 0.8f + (i % 4) * 0.35f,
+                    phase = (i * 0.82f) % (2f * PI.toFloat()),
+                    color = starColors[i % starColors.size]
                 )
             )
+        }
+
+        // Tier B: Prominent Galactic Body Stars (~35 stars)
+        for (i in 0 until 35) {
+            val dist = 0.15f + (i * 0.031f)
+            val ang = ((i * 99.7) * (PI / 180.0)).toFloat()
+            val hasSpike = (i % 9 == 0) // Hero stars with diffraction spikes
+            list.add(
+                CosmicStar(
+                    radiusFraction = dist,
+                    angleRad = ang,
+                    size = if (hasSpike) 2.6f else 1.8f + (i % 3) * 0.4f,
+                    baseAlpha = 0.45f + (i % 4) * 0.13f,
+                    twinkleSpeed = 1.1f + (i % 3) * 0.45f,
+                    phase = (i * 1.15f) % (2f * PI.toFloat()),
+                    color = if (hasSpike) Color.White else starColors[(i + 1) % starColors.size],
+                    hasSpike = hasSpike,
+                    spikeLength = if (hasSpike) 22f + (i % 3) * 6f else 0f
+                )
+            )
+        }
+
+        list
+    }
+
+    // 2. GALACTIC SPIRAL ARMS NODES (Milky Way / Andromeda spiral vortex)
+    val spiralNebulaNodes = remember {
+        val list = mutableListOf<SpiralNebulaNode>()
+        val armColors = listOf(
+            Color(0xFF8B5CF6), // Royal Purple Arm
+            Color(0xFFEC4899), // Cosmic Pink Aurora Arm
+            Color(0xFF06B6D4)  // Neon Cyan Celestial Arm
+        )
+
+        // 3 Spiral arms curling outwards
+        for (arm in 0..2) {
+            val armBaseAngle = arm * (2f * PI.toFloat() / 3f)
+            val armColor = armColors[arm]
+
+            for (step in 1..7) {
+                val t = step / 7f
+                val dist = 0.22f + t * 0.78f
+                val spiralAngle = armBaseAngle + t * 1.85f // Logarithmic curl
+                val nodeSize = 0.20f + t * 0.14f
+
+                list.add(
+                    SpiralNebulaNode(
+                        radiusFraction = dist,
+                        angleRad = spiralAngle,
+                        sizeFraction = nodeSize,
+                        color = armColor
+                    )
+                )
+            }
         }
         list
     }
 
-    // Orbiting luminous cosmic dust
-    val orbitingDust = remember {
+    // 3. CELESTIAL ORBITING GEMS (Luminous gems gliding on the galaxy circles)
+    val orbitingGems = remember {
         listOf(
-            OrbitingDust(0.32f, 0.5f, 1.2f, 3.0f, Color(0xFF9D72FF).copy(alpha = 0.55f)),
-            OrbitingDust(0.48f, 2.2f, 0.9f, 3.8f, Color(0xFFF0446A).copy(alpha = 0.45f)),
-            OrbitingDust(0.62f, 3.9f, 1.1f, 2.6f, Color(0xFF00E5FF).copy(alpha = 0.45f)),
-            OrbitingDust(0.75f, 5.3f, 0.8f, 3.4f, Color(0xFFFFD21F).copy(alpha = 0.40f)),
-            OrbitingDust(0.22f, 1.8f, 1.4f, 2.8f, Color(0xFFC084FC).copy(alpha = 0.60f))
+            // Gem 1: Inner Orbit (Aquamarine Cyan)
+            OrbitingGem(
+                orbitRadiusFraction = 0.38f,
+                speedMultiplier = 1.45f,
+                initialAngleRad = 0.4f,
+                coreColor = Color(0xFFE0F2FE),
+                glowColor = Color(0xFF00E5FF),
+                coreRadius = 3.6f,
+                glowRadius = 11.0f
+            ),
+            // Gem 2: Mid Orbit (Hot Rose / Magenta Sun)
+            OrbitingGem(
+                orbitRadiusFraction = 0.60f,
+                speedMultiplier = 1.05f,
+                initialAngleRad = 2.4f,
+                coreColor = Color(0xFFFFF1F2),
+                glowColor = Color(0xFFF0446A),
+                coreRadius = 4.2f,
+                glowRadius = 14.0f
+            ),
+            // Gem 3: Outer Belt (Solar Gold / Amber Gem)
+            OrbitingGem(
+                orbitRadiusFraction = 0.84f,
+                speedMultiplier = 0.75f,
+                initialAngleRad = 4.5f,
+                coreColor = Color(0xFFFEF9C3),
+                glowColor = Color(0xFFFFD21F),
+                coreRadius = 3.8f,
+                glowRadius = 12.0f
+            ),
+            // Gem 4: Equatorial Disc Pearl (Lilac Glow)
+            OrbitingGem(
+                orbitRadiusFraction = 1.10f,
+                speedMultiplier = 0.55f,
+                initialAngleRad = 1.2f,
+                coreColor = Color(0xFFFAF5FF),
+                glowColor = Color(0xFFA78BFA),
+                coreRadius = 3.2f,
+                glowRadius = 10.0f
+            )
         )
     }
+
+    // Precomputed dashed path effects for astronomical orbit tracks
+    val dashedOrbitEffect1 = remember { PathEffect.dashPathEffect(floatArrayOf(10f, 16f), 0f) }
+    val dashedOrbitEffect2 = remember { PathEffect.dashPathEffect(floatArrayOf(6f, 22f), 0f) }
 
     val bgGradient = remember {
         Brush.verticalGradient(
-            colors = listOf(BgDarkNavyTop, BgDarkNavyCenter, BgDarkNavyBottom)
+            colors = listOf(
+                Color(0xFF060412), // Deep Cosmic Void
+                BgDarkNavyTop,
+                BgDarkNavyCenter,
+                BgDarkNavyBottom,
+                Color(0xFF04030B)  // Midnight Abyss
+            )
         )
     }
 
-    // Infinite transitions for visible, active rotation (0 content recomposition)
-    val infiniteTransition = rememberInfiniteTransition(label = "GalaxyMovingAnimation")
+    // High performance infinite transitions (Read only inside drawBehind = 0 recomposition)
+    val infiniteTransition = rememberInfiniteTransition(label = "GalaxyMasterTransition")
 
-    // Visible clockwise rotation of main galaxy disk & stars (Complete 360° rotation in 20 seconds)
+    // Slow, regal clockwise rotation of main galaxy disk & celestial rings (Complete 360° rotation in 26s)
     val galaxyRotation by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = if (reduceMotion) 0f else 360f,
         animationSpec = infiniteRepeatable(
-            animation = tween(20000, easing = LinearEasing),
+            animation = tween(26000, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "GalaxyRotation"
     )
 
-    // Counter-clockwise rotation for inner parallax nebula depth (32 seconds)
+    // Counter-clockwise rotation for inner parallax nebula & secondary celestial sphere (38s)
     val counterRotation by infiniteTransition.animateFloat(
         initialValue = 360f,
         targetValue = if (reduceMotion) 360f else 0f,
         animationSpec = infiniteRepeatable(
-            animation = tween(32000, easing = LinearEasing),
+            animation = tween(38000, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "CounterRotation"
     )
 
-    // Breathing pulse of the galactic core
+    // Gentle breathing pulse of the galactic nucleus (7s cycle)
     val corePulse by infiniteTransition.animateFloat(
-        initialValue = 0.88f,
-        targetValue = if (reduceMotion) 0.88f else 1.14f,
+        initialValue = 0.90f,
+        targetValue = if (reduceMotion) 0.90f else 1.12f,
         animationSpec = infiniteRepeatable(
-            animation = tween(6000, easing = FastOutSlowInEasing),
+            animation = tween(7000, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "CorePulse"
     )
 
-    // Periodic shooting star zooming across the cosmos (Every 7 seconds)
+    // Shimmer wave for James Webb diamond star flares
+    val flareShimmer by infiniteTransition.animateFloat(
+        initialValue = 0.75f,
+        targetValue = if (reduceMotion) 0.75f else 1.25f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(3500, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "FlareShimmer"
+    )
+
+    // Periodic shooting star zooming across the cosmos (Every 8 seconds)
     val shootingStarProgress by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = if (reduceMotion) 0f else 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(7000, easing = LinearEasing),
+            animation = tween(8000, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "ShootingStar"
@@ -162,42 +287,62 @@ fun GalaxyBackground(
             .drawBehind {
                 val width = size.width
                 val height = size.height
-                // Galactic Core centered directly behind the Hero Record Area
-                val core = Offset(width * 0.5f, height * 0.34f)
-                val baseRadius = width * 0.85f
+                // Galactic Nucleus crowned directly behind the Hero Record Circle
+                val core = Offset(width * 0.5f, height * 0.30f)
+                val baseRadius = width * 0.88f
 
-                // ==========================================
-                // 1. ROTATING INNER NEBULA (COUNTER-ROTATING)
-                // ==========================================
+                // ==============================================================
+                // 1. DEEP SPACE NEBULA CLOUDS (PARALLAX COUNTER-ROTATING)
+                // ==============================================================
                 rotate(degrees = counterRotation, pivot = core) {
-                    val r = baseRadius * 0.70f * corePulse
+                    // Magenta Aurora Wisp
+                    val wisp1R = baseRadius * 0.75f * corePulse
+                    val wisp1Center = Offset(core.x - width * 0.14f, core.y + height * 0.05f)
                     drawCircle(
                         brush = Brush.radialGradient(
                             colors = listOf(
-                                Color(0xFFF0446A).copy(alpha = 0.14f),
-                                Color(0xFF6B1745).copy(alpha = 0.05f),
+                                Color(0xFFF0446A).copy(alpha = 0.15f),
+                                Color(0xFF6B1745).copy(alpha = 0.06f),
                                 Color.Transparent
                             ),
-                            center = Offset(core.x - width * 0.10f, core.y + height * 0.04f),
-                            radius = r
+                            center = wisp1Center,
+                            radius = wisp1R
                         ),
-                        radius = r,
-                        center = Offset(core.x - width * 0.10f, core.y + height * 0.04f)
+                        radius = wisp1R,
+                        center = wisp1Center
+                    )
+
+                    // Teal Celestial Gas Cloud
+                    val wisp2R = baseRadius * 0.65f * corePulse
+                    val wisp2Center = Offset(core.x + width * 0.18f, core.y - height * 0.04f)
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                Color(0xFF00E5FF).copy(alpha = 0.10f),
+                                Color(0xFF0E3D5C).copy(alpha = 0.04f),
+                                Color.Transparent
+                            ),
+                            center = wisp2Center,
+                            radius = wisp2R
+                        ),
+                        radius = wisp2R,
+                        center = wisp2Center
                     )
                 }
 
-                // ==========================================
-                // 2. MAIN ROTATING GALAXY (CLOCKWISE)
-                // ==========================================
+                // ==============================================================
+                // 2. MAIN ROTATING GALAXY CORE & SPIRAL ARMS
+                // ==============================================================
                 rotate(degrees = galaxyRotation, pivot = core) {
-                    // (A) Intense Glowing Galactic Core
-                    val coreR = baseRadius * 0.65f * corePulse
+                    // (A) Intense Glowing Galactic Nucleus (Multi-stage radial diffusion)
+                    val coreR = baseRadius * 0.72f * corePulse
                     drawCircle(
                         brush = Brush.radialGradient(
                             colors = listOf(
-                                Color(0xFF8B5CF6).copy(alpha = 0.22f),
-                                Color(0xFF4C2899).copy(alpha = 0.10f),
-                                Color(0xFF1E103F).copy(alpha = 0.04f),
+                                Color(0xFFA78BFA).copy(alpha = 0.28f),
+                                Color(0xFF7F5AF0).copy(alpha = 0.16f),
+                                Color(0xFF3B1779).copy(alpha = 0.07f),
+                                Color(0xFF140B30).copy(alpha = 0.02f),
                                 Color.Transparent
                             ),
                             center = core,
@@ -207,220 +352,288 @@ fun GalaxyBackground(
                         center = core
                     )
 
-                    // (B) 3 Visible Spiral Arms of the Galaxy
-                    val armAngles = listOf(0.0, 2.0944, 4.1888) // 0°, 120°, 240°
-                    val armColors = listOf(
-                        Color(0xFF8B5CF6).copy(alpha = 0.15f), // Purple
-                        Color(0xFFEC4899).copy(alpha = 0.12f), // Pink Aurora
-                        Color(0xFF38BDF8).copy(alpha = 0.11f)  // Cyan Cosmic
+                    // (B) 3 Organic Galactic Spiral Arms (Nebula Dust Wisps)
+                    for (node in spiralNebulaNodes) {
+                        val dist = node.radiusFraction * baseRadius
+                        val nodePos = Offset(
+                            core.x + dist * cos(node.angleRad),
+                            core.y + dist * sin(node.angleRad)
+                        )
+                        val nodeR = baseRadius * node.sizeFraction
+
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                colors = listOf(
+                                    node.color.copy(alpha = 0.13f),
+                                    node.color.copy(alpha = 0.04f),
+                                    Color.Transparent
+                                ),
+                                center = nodePos,
+                                radius = nodeR
+                            ),
+                            radius = nodeR,
+                            center = nodePos
+                        )
+                    }
+
+                    // ==============================================================
+                    // 3. MAJESTIC GALAXY CIRCLES & CELESTIAL ORBITAL RINGS
+                    // ==============================================================
+                    val ring1R = baseRadius * 0.38f
+                    val ring2R = baseRadius * 0.60f
+                    val ring3R = baseRadius * 0.84f
+                    val ring4R = baseRadius * 1.10f
+
+                    // Ring 1: Inner Glowing Celestial Orbit Circle (Fine Dashed Track)
+                    // Feathered soft aura pass
+                    drawCircle(
+                        color = Color(0xFF38BDF8).copy(alpha = 0.08f),
+                        radius = ring1R,
+                        center = core,
+                        style = Stroke(width = 4.5f)
+                    )
+                    // Luminous dashed track
+                    drawCircle(
+                        color = Color(0xFF38BDF8).copy(alpha = 0.32f),
+                        radius = ring1R,
+                        center = core,
+                        style = Stroke(
+                            width = 1.6f,
+                            pathEffect = dashedOrbitEffect1,
+                            cap = StrokeCap.Round
+                        )
                     )
 
-                    for (i in armAngles.indices) {
-                        val baseAng = armAngles[i]
-                        val armCol = armColors[i]
+                    // Ring 2: Mid Galaxy Orbit Circle (Glowing Double-Line Corona)
+                    // Outer diffuse glow
+                    drawCircle(
+                        color = Color(0xFFF0446A).copy(alpha = 0.10f),
+                        radius = ring2R,
+                        center = core,
+                        style = Stroke(width = 6.0f)
+                    )
+                    // Mid vibrant wire
+                    drawCircle(
+                        color = Color(0xFFEC4899).copy(alpha = 0.28f),
+                        radius = ring2R,
+                        center = core,
+                        style = Stroke(width = 1.8f)
+                    )
+                    // Inner starlight core
+                    drawCircle(
+                        color = Color(0xFFFDE047).copy(alpha = 0.14f),
+                        radius = ring2R * 0.985f,
+                        center = core,
+                        style = Stroke(width = 0.9f)
+                    )
 
-                        // Draw 3 luminous nodes along each spiral arm
-                        for (step in 1..3) {
-                            val dist = baseRadius * (0.28f + step * 0.18f)
-                            val ang = (baseAng + step * 0.45f).toFloat()
-                            val nodePos = Offset(
-                                core.x + dist * cos(ang),
-                                core.y + dist * sin(ang)
-                            )
-                            val nodeR = baseRadius * (0.22f + step * 0.06f)
+                    // Ring 3: Outer Galaxy Belt Circle (Astronomical Stippled Chart Track)
+                    drawCircle(
+                        color = Color(0xFFA78BFA).copy(alpha = 0.26f),
+                        radius = ring3R,
+                        center = core,
+                        style = Stroke(
+                            width = 1.4f,
+                            pathEffect = dashedOrbitEffect2,
+                            cap = StrokeCap.Round
+                        )
+                    )
 
-                            drawCircle(
-                                brush = Brush.radialGradient(
-                                    colors = listOf(armCol, Color.Transparent),
-                                    center = nodePos,
-                                    radius = nodeR
+                    // Ring 4: Far Cosmic Halo Circle (Subtle Boundary Halo)
+                    drawCircle(
+                        color = Color(0xFF818CF8).copy(alpha = 0.14f),
+                        radius = ring4R,
+                        center = core,
+                        style = Stroke(width = 1.0f)
+                    )
+
+                    // ==============================================================
+                    // 4. 3D TILTED ACCRETION RINGS (SATURN / MILKY WAY GALACTIC DISC)
+                    // ==============================================================
+                    // Primary 3D Tilted Galactic Disc (-26° tilt angle)
+                    rotate(degrees = -26f, pivot = core) {
+                        val discWidth = baseRadius * 1.85f
+                        val discHeight = baseRadius * 0.62f
+                        val discTopLeft = Offset(core.x - discWidth * 0.5f, core.y - discHeight * 0.5f)
+                        val discSize = Size(discWidth, discHeight)
+
+                        // Outer soft atmospheric glow
+                        drawOval(
+                            brush = Brush.sweepGradient(
+                                colors = listOf(
+                                    Color(0xFF8B5CF6).copy(alpha = 0.12f),
+                                    Color(0xFFEC4899).copy(alpha = 0.14f),
+                                    Color(0xFF00E5FF).copy(alpha = 0.10f),
+                                    Color(0xFFFFD21F).copy(alpha = 0.08f),
+                                    Color(0xFF8B5CF6).copy(alpha = 0.12f)
                                 ),
-                                radius = nodeR,
-                                center = nodePos
+                                center = core
+                            ),
+                            topLeft = discTopLeft,
+                            size = discSize,
+                            style = Stroke(width = 6.5f)
+                        )
+
+                        // Luminous core razor line
+                        drawOval(
+                            brush = Brush.sweepGradient(
+                                colors = listOf(
+                                    Color(0xFFA78BFA).copy(alpha = 0.42f),
+                                    Color(0xFFF472B6).copy(alpha = 0.38f),
+                                    Color(0xFF38BDF8).copy(alpha = 0.35f),
+                                    Color(0xFFFDE68A).copy(alpha = 0.25f),
+                                    Color(0xFFA78BFA).copy(alpha = 0.42f)
+                                ),
+                                center = core
+                            ),
+                            topLeft = discTopLeft,
+                            size = discSize,
+                            style = Stroke(width = 1.8f)
+                        )
+                    }
+
+                    // Secondary Equatorial Orbit Ring (+22° counter-tilt angle)
+                    rotate(degrees = 22f, pivot = core) {
+                        val disc2Width = baseRadius * 1.45f
+                        val disc2Height = baseRadius * 0.48f
+                        val disc2TopLeft = Offset(core.x - disc2Width * 0.5f, core.y - disc2Height * 0.5f)
+
+                        drawOval(
+                            color = Color(0xFFC084FC).copy(alpha = 0.22f),
+                            topLeft = disc2TopLeft,
+                            size = Size(disc2Width, disc2Height),
+                            style = Stroke(
+                                width = 1.2f,
+                                pathEffect = dashedOrbitEffect1,
+                                cap = StrokeCap.Round
+                            )
+                        )
+                    }
+
+                    // ==============================================================
+                    // 5. ORBITING LUMINOUS CELESTIAL GEMS (PLANETS & CORONAS)
+                    // ==============================================================
+                    if (!reduceMotion) {
+                        for (gem in orbitingGems) {
+                            val orbitR = gem.orbitRadiusFraction * baseRadius
+                            val curAng = gem.initialAngleRad + (galaxyRotation * (PI / 180.0) * gem.speedMultiplier).toFloat()
+                            val gemPos = Offset(
+                                core.x + orbitR * cos(curAng),
+                                core.y + orbitR * sin(curAng)
+                            )
+
+                            // Outer diffuse corona
+                            drawCircle(
+                                color = gem.glowColor.copy(alpha = 0.22f),
+                                radius = gem.glowRadius * 1.8f,
+                                center = gemPos
+                            )
+
+                            // Vibrant neon aura
+                            drawCircle(
+                                color = gem.glowColor.copy(alpha = 0.55f),
+                                radius = gem.glowRadius,
+                                center = gemPos
+                            )
+
+                            // Diamond white core
+                            drawCircle(
+                                color = gem.coreColor,
+                                radius = gem.coreRadius,
+                                center = gemPos
+                            )
+
+                            // Faint trailing stardust node
+                            val trailAng = curAng - (0.09f * gem.speedMultiplier)
+                            val trailPos = Offset(
+                                core.x + orbitR * cos(trailAng),
+                                core.y + orbitR * sin(trailAng)
+                            )
+                            drawCircle(
+                                color = gem.glowColor.copy(alpha = 0.35f),
+                                radius = gem.coreRadius * 0.6f,
+                                center = trailPos
                             )
                         }
                     }
 
-                    // (C) LUMINOUS CONCENTRIC GALAXY CIRCLES & ORBITAL RINGS
-                    val ring1R = baseRadius * 0.38f
-                    val ring2R = baseRadius * 0.58f
-                    val ring3R = baseRadius * 0.82f
-                    val ring4R = baseRadius * 1.10f
-
-                    // Ring 1: Inner Glowing Celestial Orbit Circle
-                    drawCircle(
-                        color = Color(0xFF8B5CF6).copy(alpha = 0.22f),
-                        radius = ring1R,
-                        center = core,
-                        style = Stroke(width = 1.8f)
-                    )
-
-                    // Ring 2: Mid Galaxy Orbit Circle
-                    drawCircle(
-                        color = Color(0xFFEC4899).copy(alpha = 0.18f),
-                        radius = ring2R,
-                        center = core,
-                        style = Stroke(width = 1.4f)
-                    )
-
-                    // Ring 3: Outer Galaxy Belt Circle
-                    drawCircle(
-                        color = Color(0xFF38BDF8).copy(alpha = 0.16f),
-                        radius = ring3R,
-                        center = core,
-                        style = Stroke(width = 1.6f)
-                    )
-
-                    // Ring 4: Far Cosmic Halo Circle
-                    drawCircle(
-                        color = Color(0xFFA78BFA).copy(alpha = 0.11f),
-                        radius = ring4R,
-                        center = core,
-                        style = Stroke(width = 1.2f)
-                    )
-
-                    // Tilted 3D Elliptical Galaxy Ring (Saturn / Milky Way Disc Circle)
-                    val ovalWidth = baseRadius * 1.70f
-                    val ovalHeight = baseRadius * 0.65f
-                    val ovalTopLeft = Offset(core.x - ovalWidth * 0.5f, core.y - ovalHeight * 0.5f)
-
-                    drawOval(
-                        brush = Brush.sweepGradient(
-                            colors = listOf(
-                                Color(0xFF8B5CF6).copy(alpha = 0.30f),
-                                Color(0xFFEC4899).copy(alpha = 0.24f),
-                                Color(0xFF38BDF8).copy(alpha = 0.20f),
-                                Color(0xFF8B5CF6).copy(alpha = 0.08f),
-                                Color(0xFF8B5CF6).copy(alpha = 0.30f)
-                            ),
-                            center = core
-                        ),
-                        topLeft = ovalTopLeft,
-                        size = Size(ovalWidth, ovalHeight),
-                        style = Stroke(width = 2.2f)
-                    )
-
-                    // Secondary Tilted Orbit Circle
-                    val oval2Width = baseRadius * 1.30f
-                    val oval2Height = baseRadius * 0.50f
-                    val oval2TopLeft = Offset(core.x - oval2Width * 0.5f, core.y - oval2Height * 0.5f)
-
-                    drawOval(
-                        color = Color(0xFFC084FC).copy(alpha = 0.18f),
-                        topLeft = oval2TopLeft,
-                        size = Size(oval2Width, oval2Height),
-                        style = Stroke(width = 1.4f)
-                    )
-
-                    // (D) Glowing Orbital Marker Beads orbiting on the circles
-                    if (!reduceMotion) {
-                        // Pearl on Ring 1
-                        val bead1Ang = (galaxyRotation * 1.3f * (PI / 180.0)).toFloat()
-                        drawCircle(
-                            color = Color(0xFFEC4899),
-                            radius = 4.0f,
-                            center = Offset(core.x + ring1R * cos(bead1Ang), core.y + ring1R * sin(bead1Ang))
-                        )
-                        drawCircle(
-                            color = Color(0xFFEC4899).copy(alpha = 0.35f),
-                            radius = 9.0f,
-                            center = Offset(core.x + ring1R * cos(bead1Ang), core.y + ring1R * sin(bead1Ang))
-                        )
-
-                        // Pearl on Ring 2
-                        val bead2Ang = (galaxyRotation * 0.9f * (PI / 180.0) + 2.1).toFloat()
-                        drawCircle(
-                            color = Color(0xFF38BDF8),
-                            radius = 3.5f,
-                            center = Offset(core.x + ring2R * cos(bead2Ang), core.y + ring2R * sin(bead2Ang))
-                        )
-                        drawCircle(
-                            color = Color(0xFF38BDF8).copy(alpha = 0.30f),
-                            radius = 8.0f,
-                            center = Offset(core.x + ring2R * cos(bead2Ang), core.y + ring2R * sin(bead2Ang))
-                        )
-
-                        // Pearl on Ring 3
-                        val bead3Ang = (galaxyRotation * 0.7f * (PI / 180.0) + 4.2).toFloat()
-                        drawCircle(
-                            color = Color(0xFFFFD21F),
-                            radius = 3.8f,
-                            center = Offset(core.x + ring3R * cos(bead3Ang), core.y + ring3R * sin(bead3Ang))
-                        )
-                        drawCircle(
-                            color = Color(0xFFFFD21F).copy(alpha = 0.35f),
-                            radius = 8.5f,
-                            center = Offset(core.x + ring3R * cos(bead3Ang), core.y + ring3R * sin(bead3Ang))
-                        )
-                    }
-
-                    // (E) Rotating Starfield (Stars revolve around the core in real-time)
-                    val timeSec = galaxyRotation * 0.1f
-                    for (star in spiralStars) {
+                    // ==============================================================
+                    // 6. SCINTILLATING STARFIELD & JAMES WEBB DIAMOND FLARES
+                    // ==============================================================
+                    val timeSec = galaxyRotation * 0.12f
+                    for (star in cosmicStars) {
                         val dist = star.radiusFraction * baseRadius
                         val starPos = Offset(
                             core.x + dist * cos(star.angleRad),
                             core.y + dist * sin(star.angleRad)
                         )
 
-                        // Twinkle calculation
+                        // Astronomical twinkle scintillation
                         val wave = sin(timeSec * star.twinkleSpeed + star.phase)
-                        val alpha = if (reduceMotion) star.baseAlpha else (star.baseAlpha + wave * 0.35f).coerceIn(0.15f, 1.0f)
-                        val sz = star.size * if (!reduceMotion && alpha > 0.75f) 1.35f else 1.0f
+                        val alpha = if (reduceMotion) star.baseAlpha else (star.baseAlpha + wave * 0.35f).coerceIn(0.12f, 1.0f)
+                        val sz = star.size * if (!reduceMotion && alpha > 0.72f) 1.25f else 1.0f
 
+                        // Main Star Orb
                         drawCircle(
-                            color = Color.White.copy(alpha = alpha),
+                            color = star.color.copy(alpha = alpha),
                             radius = sz,
                             center = starPos
                         )
 
-                        // Star flare on prominent stars
-                        if (sz > 2.0f && alpha > 0.80f && !reduceMotion) {
+                        // 4-Point James Webb Diamond Cross-Spikes on Hero Stars
+                        if (star.hasSpike && !reduceMotion) {
+                            val spLen = star.spikeLength * flareShimmer
+                            val spikeAlpha = (alpha * 0.65f).coerceIn(0f, 0.85f)
+                            val spikeColor = Color.White.copy(alpha = spikeAlpha)
+
+                            // Horizontal Ray
+                            drawLine(
+                                color = spikeColor,
+                                start = Offset(starPos.x - spLen, starPos.y),
+                                end = Offset(starPos.x + spLen, starPos.y),
+                                strokeWidth = 1.0f,
+                                cap = StrokeCap.Round
+                            )
+
+                            // Vertical Ray
+                            drawLine(
+                                color = spikeColor,
+                                start = Offset(starPos.x, starPos.y - spLen),
+                                end = Offset(starPos.x, starPos.y + spLen),
+                                strokeWidth = 1.0f,
+                                cap = StrokeCap.Round
+                            )
+
+                            // Soft ambient halo around hero star
                             drawCircle(
-                                color = Color(0xFFA78BFA).copy(alpha = 0.30f),
-                                radius = sz * 2.8f,
+                                color = Color(0xFFA78BFA).copy(alpha = spikeAlpha * 0.40f),
+                                radius = sz * 3.5f,
                                 center = starPos
-                            )
-                        }
-                    }
-
-                    // (F) Orbiting Luminous Cosmic Dust Particles
-                    if (!reduceMotion) {
-                        for (dust in orbitingDust) {
-                            val dustDist = dust.orbitRadiusFraction * baseRadius
-                            val curAng = dust.baseAngleRad + (galaxyRotation * (PI / 180.0) * dust.angularSpeedMultiplier).toFloat()
-                            val dustPos = Offset(
-                                core.x + dustDist * cos(curAng),
-                                core.y + dustDist * sin(curAng)
-                            )
-
-                            drawCircle(
-                                color = dust.color,
-                                radius = dust.size,
-                                center = dustPos
                             )
                         }
                     }
                 }
 
-                // ==========================================
-                // 3. PERIODIC SHOOTING STAR (METEOR)
-                // ==========================================
-                if (!reduceMotion && shootingStarProgress in 0.10f..0.32f) {
-                    val meteorT = (shootingStarProgress - 0.10f) / 0.22f // 0f -> 1f
-                    val startX = width * (0.85f - meteorT * 0.65f)
-                    val startY = height * (0.08f + meteorT * 0.38f)
-                    val tailLen = 65f * (1f - (meteorT - 0.5f) * (meteorT - 0.5f) * 4f).coerceAtLeast(0.3f)
+                // ==============================================================
+                // 7. REALISTIC PERIODIC SHOOTING STAR (METEOR)
+                // ==============================================================
+                if (!reduceMotion && shootingStarProgress in 0.08f..0.28f) {
+                    val meteorT = (shootingStarProgress - 0.08f) / 0.20f // Normalized 0f -> 1f
+                    val startX = width * (0.88f - meteorT * 0.68f)
+                    val startY = height * (0.06f + meteorT * 0.36f)
+                    val tailLen = 80f * (1f - (meteorT - 0.5f) * (meteorT - 0.5f) * 4f).coerceAtLeast(0.2f)
 
                     val endX = startX + tailLen * 0.85f
                     val endY = startY - tailLen * 0.52f
-                    val meteorAlpha = (sin(meteorT * PI.toFloat())).coerceIn(0f, 1f) * 0.85f
+                    val meteorAlpha = (sin(meteorT * PI.toFloat())).coerceIn(0f, 1f) * 0.90f
 
+                    // Meteor tail
                     drawLine(
                         brush = Brush.linearGradient(
                             colors = listOf(
                                 Color.White.copy(alpha = meteorAlpha),
-                                Color(0xFFA78BFA).copy(alpha = meteorAlpha * 0.6f),
+                                Color(0xFF67E8F9).copy(alpha = meteorAlpha * 0.70f),
+                                Color(0xFFA78BFA).copy(alpha = meteorAlpha * 0.35f),
                                 Color.Transparent
                             ),
                             start = Offset(startX, startY),
@@ -428,8 +641,20 @@ fun GalaxyBackground(
                         ),
                         start = Offset(startX, startY),
                         end = Offset(endX, endY),
-                        strokeWidth = 2.4f,
+                        strokeWidth = 2.2f,
                         cap = StrokeCap.Round
+                    )
+
+                    // Meteor Head Spark
+                    drawCircle(
+                        color = Color.White.copy(alpha = meteorAlpha),
+                        radius = 2.4f,
+                        center = Offset(startX, startY)
+                    )
+                    drawCircle(
+                        color = Color(0xFF38BDF8).copy(alpha = meteorAlpha * 0.5f),
+                        radius = 5.0f,
+                        center = Offset(startX, startY)
                     )
                 }
             }
