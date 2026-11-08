@@ -11,6 +11,7 @@ import android.media.projection.MediaProjectionManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -64,8 +65,10 @@ import com.veylqo.recora.ui.components.GalaxyBackground
 import com.veylqo.recora.ui.components.GlassNavBar
 import com.veylqo.recora.ui.dialogs.DeleteConfirmDialog
 import com.veylqo.recora.ui.dialogs.InfoDialog
+import com.veylqo.recora.ui.dialogs.OverlayPermissionDialog
 import com.veylqo.recora.ui.dialogs.RedeemCodeDialog
 import com.veylqo.recora.ui.dialogs.RenameDialog
+import com.veylqo.recora.ui.dialogs.TouchSetupDialog
 import com.veylqo.recora.ui.navigation.NavTab
 import com.veylqo.recora.ui.screens.more.MoreScreen
 import com.veylqo.recora.ui.screens.record.CountdownScreen
@@ -152,6 +155,8 @@ fun RecoraApp() {
     var showTimerSheet by remember { mutableStateOf(false) }
     var showPlanSheet by remember { mutableStateOf(false) }
     var showRedeemDialog by remember { mutableStateOf(false) }
+    var showOverlayPermissionDialog by remember { mutableStateOf(false) }
+    var showTouchSetupDialog by remember { mutableStateOf(false) }
     var infoDialogData by remember { mutableStateOf<Pair<String, String>?>(null) }
 
     // Floating toast pill
@@ -163,6 +168,17 @@ fun RecoraApp() {
             if (toastMessage == message) {
                 toastMessage = null
             }
+        }
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            uiState = uiState.copy(facecam = true)
+            showToast("Facecam enabled")
+        } else {
+            showToast("Camera permission required for Facecam")
         }
     }
 
@@ -191,6 +207,9 @@ fun RecoraApp() {
             putExtra(RecordingService.EXTRA_FPS, fpsVal)
             putExtra(RecordingService.EXTRA_QUALITY_LABEL, "${uiState.resolution.label} · ${uiState.fps.label}")
             putExtra(RecordingService.EXTRA_AUDIO_LABEL, uiState.audioSource.displayName)
+            putExtra(RecordingService.EXTRA_ENABLE_CONTROLS, uiState.floatingControls)
+            putExtra(RecordingService.EXTRA_ENABLE_PEN, uiState.penAndTools)
+            putExtra(RecordingService.EXTRA_ENABLE_FACECAM, uiState.facecam)
         }
 
         ContextCompat.startForegroundService(context, serviceIntent)
@@ -279,10 +298,40 @@ fun RecoraApp() {
                                 onQualityClick = { showQualitySheet = true },
                                 onOrientationClick = { showOrientationSheet = true },
                                 onTimerClick = { showTimerSheet = true },
-                                onToggleControls = { uiState = uiState.copy(floatingControls = it) },
-                                onTogglePen = { uiState = uiState.copy(penAndTools = it) },
-                                onToggleFacecam = { uiState = uiState.copy(facecam = it) },
-                                onToggleTouches = { uiState = uiState.copy(showTouches = it) },
+                                onToggleControls = { enabled ->
+                                    if (enabled && !Settings.canDrawOverlays(context)) {
+                                        showOverlayPermissionDialog = true
+                                    } else {
+                                        uiState = uiState.copy(floatingControls = enabled)
+                                        showToast(if (enabled) "Floating Controls enabled" else "Floating Controls disabled")
+                                    }
+                                },
+                                onTogglePen = { enabled ->
+                                    if (enabled && !Settings.canDrawOverlays(context)) {
+                                        showOverlayPermissionDialog = true
+                                    } else {
+                                        uiState = uiState.copy(penAndTools = enabled)
+                                        showToast(if (enabled) "Pen & Tools enabled" else "Pen & Tools disabled")
+                                    }
+                                },
+                                onToggleFacecam = { enabled ->
+                                    if (enabled) {
+                                        if (!Settings.canDrawOverlays(context)) {
+                                            showOverlayPermissionDialog = true
+                                        } else if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                                            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                                        } else {
+                                            uiState = uiState.copy(facecam = true)
+                                            showToast("Facecam enabled")
+                                        }
+                                    } else {
+                                        uiState = uiState.copy(facecam = false)
+                                        showToast("Facecam disabled")
+                                    }
+                                },
+                                onToggleTouches = {
+                                    showTouchSetupDialog = true
+                                },
                                 onStartRecordingClick = {
                                     if (isRecording) {
                                         showToast("Recording already in progress")
@@ -541,6 +590,20 @@ fun RecoraApp() {
                     title = title,
                     message = msg,
                     onDismiss = { infoDialogData = null }
+                )
+            }
+
+            if (showOverlayPermissionDialog) {
+                OverlayPermissionDialog(
+                    context = context,
+                    onDismiss = { showOverlayPermissionDialog = false }
+                )
+            }
+
+            if (showTouchSetupDialog) {
+                TouchSetupDialog(
+                    context = context,
+                    onDismiss = { showTouchSetupDialog = false }
                 )
             }
         }

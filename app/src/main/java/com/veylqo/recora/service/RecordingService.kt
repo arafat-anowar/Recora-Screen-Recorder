@@ -71,6 +71,9 @@ class RecordingService : Service() {
         const val EXTRA_QUALITY_LABEL = "extra_quality_label"
         const val EXTRA_AUDIO_LABEL = "extra_audio_label"
         const val EXTRA_TARGET_URI = "extra_target_uri"
+        const val EXTRA_ENABLE_CONTROLS = "extra_enable_controls"
+        const val EXTRA_ENABLE_PEN = "extra_enable_pen"
+        const val EXTRA_ENABLE_FACECAM = "extra_enable_facecam"
 
         private val _serviceState = MutableStateFlow(ServiceRecordingState())
         val serviceState: StateFlow<ServiceRecordingState> = _serviceState.asStateFlow()
@@ -79,6 +82,7 @@ class RecordingService : Service() {
     private val serviceScope = CoroutineScope(Dispatchers.Main + Job())
     private lateinit var mediaStoreRepository: MediaStoreRepository
     private lateinit var notificationManager: NotificationManager
+    private lateinit var overlayManager: com.veylqo.recora.service.overlay.OverlayManager
 
     private var mediaProjection: MediaProjection? = null
     private var virtualDisplay: VirtualDisplay? = null
@@ -99,6 +103,17 @@ class RecordingService : Service() {
         super.onCreate()
         mediaStoreRepository = MediaStoreRepository(this)
         notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        overlayManager = com.veylqo.recora.service.overlay.OverlayManager(
+            context = this,
+            onStopRecording = { stopRecordingSession() },
+            onPauseResume = { isPaused -> if (isPaused) pauseRecording() else resumeRecording() },
+            onScreenshot = {
+                // Screenshot action indicator
+            },
+            onMicMute = { isMuted ->
+                // Mic mute indicator
+            }
+        )
         createNotificationChannels()
     }
 
@@ -119,11 +134,14 @@ class RecordingService : Service() {
                 val width = intent.getIntExtra(EXTRA_WIDTH, 1080)
                 val height = intent.getIntExtra(EXTRA_HEIGHT, 1920)
                 val fps = intent.getIntExtra(EXTRA_FPS, 60)
+                val enableControls = intent.getBooleanExtra(EXTRA_ENABLE_CONTROLS, false)
+                val enablePen = intent.getBooleanExtra(EXTRA_ENABLE_PEN, false)
+                val enableFacecam = intent.getBooleanExtra(EXTRA_ENABLE_FACECAM, false)
                 qualityLabel = intent.getStringExtra(EXTRA_QUALITY_LABEL) ?: "$width x $height · ${fps}fps"
                 audioLabel = intent.getStringExtra(EXTRA_AUDIO_LABEL) ?: audioSource.displayName
 
                 if (resultData != null && resultCode != 0) {
-                    startRecordingSession(resultCode, resultData, audioSource, width, height, fps)
+                    startRecordingSession(resultCode, resultData, audioSource, width, height, fps, enableControls, enablePen, enableFacecam)
                 } else {
                     Log.e(TAG, "Cannot start recording: Missing MediaProjection permission data")
                     stopSelf()
@@ -152,7 +170,10 @@ class RecordingService : Service() {
         audioSource: AudioSource,
         reqWidth: Int,
         reqHeight: Int,
-        reqFps: Int
+        reqFps: Int,
+        enableControls: Boolean,
+        enablePen: Boolean,
+        enableFacecam: Boolean
     ) {
         serviceScope.launch {
             try {
@@ -275,6 +296,17 @@ class RecordingService : Service() {
                 isRecording = true
                 isPaused = false
                 durationSeconds = 0
+
+                // 9. Show overlays if requested
+                if (enableControls) {
+                    overlayManager.showControlsOverlay()
+                }
+                if (enablePen) {
+                    overlayManager.showPenOverlay()
+                }
+                if (enableFacecam) {
+                    overlayManager.showFacecamOverlay()
+                }
 
                 startTimer()
                 updateState(RecordingStatus.RECORDING)
@@ -495,6 +527,12 @@ class RecordingService : Service() {
     }
 
     private fun cleanUp() {
+        try {
+            overlayManager.removeAllOverlays()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error removing overlays", e)
+        }
+
         try {
             virtualDisplay?.release()
             virtualDisplay = null
