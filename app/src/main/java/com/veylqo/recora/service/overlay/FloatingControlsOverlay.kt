@@ -3,18 +3,19 @@ package com.veylqo.recora.service.overlay
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.graphics.PixelFormat
+import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.view.Gravity
-import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.TextView
 import com.veylqo.recora.R
-import com.veylqo.recora.service.RecordingService
 import kotlin.math.abs
 
 class FloatingControlsOverlay(
@@ -34,6 +35,7 @@ class FloatingControlsOverlay(
     fun show() {
         if (overlayView != null) return
 
+        val density = context.resources.displayMetrics.density
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -47,88 +49,97 @@ class FloatingControlsOverlay(
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = 40
-            y = 200
+            x = (20 * density).toInt()
+            y = (180 * density).toInt()
         }
 
         val container = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
-            setPadding(24, 16, 24, 16)
-            background = createPillBackground()
-            elevation = 20f
+            setPadding((12 * density).toInt(), (8 * density).toInt(), (14 * density).toInt(), (8 * density).toInt())
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = 60 * density
+                setColor(Color.parseColor("#EE120E29"))
+                setStroke((1.5f * density).toInt(), Color.parseColor("#7F5AF0"))
+            }
+            elevation = 24f
+            gravity = Gravity.CENTER_VERTICAL
         }
 
-        // 1. Pause / Resume Button
-        val pauseBtn = createActionButton(android.R.drawable.ic_media_pause) {
-            isPaused = !isPaused
-            onPauseResumeClick(isPaused)
-            (it as ImageView).setImageResource(
-                if (isPaused) android.R.drawable.ic_media_play else android.R.drawable.ic_media_pause
-            )
+        // 1. Dedicated Drag Handle Grip on the left
+        val dragHandle = TextView(context).apply {
+            text = "⋮⋮"
+            setTextColor(Color.parseColor("#A58BFF"))
+            textSize = 16f
+            setPadding((4 * density).toInt(), 0, (8 * density).toInt(), 0)
+            gravity = Gravity.CENTER
         }
-        container.addView(pauseBtn)
+        container.addView(dragHandle)
 
-        // 2. Stop Button
-        val stopBtn = createActionButton(android.R.drawable.ic_delete, isStop = true) {
-            onStopClick()
-        }
-        container.addView(stopBtn)
-
-        // 3. Pen & Tools Toggle Button
-        val penBtn = createActionButton(android.R.drawable.ic_menu_edit) {
-            onPenToggleClick()
-        }
-        container.addView(penBtn)
-
-        // 4. Screenshot Button
-        val cameraBtn = createActionButton(android.R.drawable.ic_menu_camera) {
-            onScreenshotClick()
-        }
-        container.addView(cameraBtn)
-
-        // 5. Mic Mute Toggle Button
-        val micBtn = createActionButton(android.R.drawable.stat_notify_chat) {
-            isMuted = !isMuted
-            onMicMuteClick(isMuted)
-            it.alpha = if (isMuted) 0.4f else 1.0f
-        }
-        container.addView(micBtn)
-
-        // Touch listener for smooth dragging
+        // Drag listener strictly on the dragHandle so buttons receive pure clicks!
         var initialX = 0
         var initialY = 0
         var initialTouchX = 0f
         var initialTouchY = 0f
-        var hasMoved = false
 
-        container.setOnTouchListener { _, event ->
+        dragHandle.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
                     initialX = params.x
                     initialY = params.y
                     initialTouchX = event.rawX
                     initialTouchY = event.rawY
-                    hasMoved = false
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
                     val dx = (event.rawX - initialTouchX).toInt()
                     val dy = (event.rawY - initialTouchY).toInt()
-                    if (abs(dx) > 10 || abs(dy) > 10) {
-                        hasMoved = true
-                        params.x = initialX + dx
-                        params.y = initialY + dy
-                        try {
-                            windowManager.updateViewLayout(container, params)
-                        } catch (e: Exception) {
-                            // Ignored if window detached
-                        }
-                    }
+                    params.x = initialX + dx
+                    params.y = initialY + dy
+                    try {
+                        windowManager.updateViewLayout(container, params)
+                    } catch (e: Exception) {}
                     true
                 }
                 else -> false
             }
         }
+
+        // 2. Pause / Resume Button
+        val pauseBtn = createActionButton(android.R.drawable.ic_media_pause, bgColor = "#251D4D") { view ->
+            isPaused = !isPaused
+            onPauseResumeClick(isPaused)
+            (view as ImageView).setImageResource(
+                if (isPaused) android.R.drawable.ic_media_play else android.R.drawable.ic_media_pause
+            )
+        }
+        container.addView(pauseBtn)
+
+        // 3. Stop Button (Vibrant Pink Disc)
+        val stopBtn = createActionButton(android.R.drawable.ic_delete, bgColor = "#F0446A") {
+            onStopClick()
+        }
+        container.addView(stopBtn)
+
+        // 4. Pen & Tools Toggle Button
+        val penBtn = createActionButton(android.R.drawable.ic_menu_edit, bgColor = "#251D4D") {
+            onPenToggleClick()
+        }
+        container.addView(penBtn)
+
+        // 5. Screenshot Button
+        val cameraBtn = createActionButton(android.R.drawable.ic_menu_camera, bgColor = "#251D4D") {
+            onScreenshotClick()
+        }
+        container.addView(cameraBtn)
+
+        // 6. Mic Mute Button
+        val micBtn = createActionButton(android.R.drawable.stat_notify_chat, bgColor = "#251D4D") { view ->
+            isMuted = !isMuted
+            onMicMuteClick(isMuted)
+            view.alpha = if (isMuted) 0.35f else 1.0f
+        }
+        container.addView(micBtn)
 
         overlayView = container
         try {
@@ -142,48 +153,30 @@ class FloatingControlsOverlay(
         overlayView?.let { view ->
             try {
                 windowManager.removeView(view)
-            } catch (e: Exception) {
-                // Already removed
-            }
+            } catch (e: Exception) {}
             overlayView = null
         }
     }
 
-    private fun createActionButton(iconRes: Int, isStop: Boolean = false, onClick: (View) -> Unit): View {
+    private fun createActionButton(iconRes: Int, bgColor: String, onClick: (View) -> Unit): ImageView {
+        val density = context.resources.displayMetrics.density
+        val btnSize = (38 * density).toInt()
+        val pad = (8 * density).toInt()
+
         return ImageView(context).apply {
             setImageResource(iconRes)
-            val pad = 18
             setPadding(pad, pad, pad, pad)
-            val btnSize = 100
             layoutParams = LinearLayout.LayoutParams(btnSize, btnSize).apply {
-                setMargins(8, 0, 8, 0)
+                setMargins((4 * density).toInt(), 0, (4 * density).toInt(), 0)
             }
-            background = if (isStop) createStopCircleBackground() else createCircleButtonBackground()
-            setColorFilter(android.graphics.Color.WHITE)
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.parseColor(bgColor))
+            }
+            setColorFilter(Color.WHITE)
+            isClickable = true
+            isFocusable = false
             setOnClickListener { onClick(it) }
-        }
-    }
-
-    private fun createPillBackground(): android.graphics.drawable.GradientDrawable {
-        return android.graphics.drawable.GradientDrawable().apply {
-            shape = android.graphics.drawable.GradientDrawable.RECTANGLE
-            cornerRadius = 90f
-            setColor(android.graphics.Color.parseColor("#E6141029"))
-            setStroke(3, android.graphics.Color.parseColor("#7F5AF0"))
-        }
-    }
-
-    private fun createCircleButtonBackground(): android.graphics.drawable.GradientDrawable {
-        return android.graphics.drawable.GradientDrawable().apply {
-            shape = android.graphics.drawable.GradientDrawable.OVAL
-            setColor(android.graphics.Color.parseColor("#251D4D"))
-        }
-    }
-
-    private fun createStopCircleBackground(): android.graphics.drawable.GradientDrawable {
-        return android.graphics.drawable.GradientDrawable().apply {
-            shape = android.graphics.drawable.GradientDrawable.OVAL
-            setColor(android.graphics.Color.parseColor("#F0446A"))
         }
     }
 }

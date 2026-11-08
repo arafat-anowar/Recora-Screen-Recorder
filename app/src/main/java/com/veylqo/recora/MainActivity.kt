@@ -171,11 +171,70 @@ fun RecoraApp() {
         }
     }
 
+    // In-app Overlay Manager for interactive preview & live controls
+    val previewOverlayManager = remember {
+        com.veylqo.recora.service.overlay.OverlayManager(
+            context = context.applicationContext,
+            onStopRecording = {
+                if (isRecording) {
+                    val intent = Intent(context, RecordingService::class.java).apply {
+                        action = RecordingService.ACTION_STOP
+                    }
+                    context.startService(intent)
+                } else {
+                    uiState = uiState.copy(floatingControls = false)
+                }
+            },
+            onPauseResume = { isPaused ->
+                if (isRecording) {
+                    val action = if (isPaused) RecordingService.ACTION_PAUSE else RecordingService.ACTION_RESUME
+                    val intent = Intent(context, RecordingService::class.java).apply { this.action = action }
+                    context.startService(intent)
+                }
+            },
+            onScreenshot = {
+                showToast("Screenshot captured")
+            },
+            onMicMute = { isMuted ->
+                showToast(if (isMuted) "Microphone muted" else "Microphone unmuted")
+            },
+            onPenClosed = {
+                uiState = uiState.copy(penAndTools = false)
+            },
+            onFacecamClosed = {
+                uiState = uiState.copy(facecam = false)
+            }
+        )
+    }
+
+    // Observe activity lifecycle to sync touches setting and prevent window leaks
+    androidx.compose.runtime.DisposableEffect(context) {
+        val activity = context as? ComponentActivity
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                val touchesOn = try {
+                    Settings.System.getInt(context.contentResolver, "show_touches", 0) == 1
+                } catch (e: Exception) {
+                    false
+                }
+                uiState = uiState.copy(showTouches = touchesOn)
+            }
+        }
+        activity?.lifecycle?.addObserver(observer)
+        onDispose {
+            activity?.lifecycle?.removeObserver(observer)
+            previewOverlayManager.removeAllOverlays()
+        }
+    }
+
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) {
             uiState = uiState.copy(facecam = true)
+            if (!isRecording) {
+                previewOverlayManager.showFacecamOverlay()
+            }
             showToast("Facecam enabled")
         } else {
             showToast("Camera permission required for Facecam")
@@ -184,6 +243,8 @@ fun RecoraApp() {
 
     // Launch Service with projection intent
     fun executeStartService(resultCode: Int, resultData: Intent) {
+        previewOverlayManager.removeAllOverlays()
+
         val (w, h) = when (uiState.resolution) {
             VideoResolution.UHD -> 3840 to 2160
             VideoResolution.QHD -> 2560 to 1440
@@ -299,19 +360,37 @@ fun RecoraApp() {
                                 onOrientationClick = { showOrientationSheet = true },
                                 onTimerClick = { showTimerSheet = true },
                                 onToggleControls = { enabled ->
-                                    if (enabled && !Settings.canDrawOverlays(context)) {
-                                        showOverlayPermissionDialog = true
+                                    if (enabled) {
+                                        if (!Settings.canDrawOverlays(context)) {
+                                            showOverlayPermissionDialog = true
+                                        } else {
+                                            uiState = uiState.copy(floatingControls = true)
+                                            if (!isRecording) {
+                                                previewOverlayManager.showControlsOverlay()
+                                            }
+                                            showToast("Floating Controls enabled")
+                                        }
                                     } else {
-                                        uiState = uiState.copy(floatingControls = enabled)
-                                        showToast(if (enabled) "Floating Controls enabled" else "Floating Controls disabled")
+                                        uiState = uiState.copy(floatingControls = false)
+                                        previewOverlayManager.hideControlsOverlay()
+                                        showToast("Floating Controls disabled")
                                     }
                                 },
                                 onTogglePen = { enabled ->
-                                    if (enabled && !Settings.canDrawOverlays(context)) {
-                                        showOverlayPermissionDialog = true
+                                    if (enabled) {
+                                        if (!Settings.canDrawOverlays(context)) {
+                                            showOverlayPermissionDialog = true
+                                        } else {
+                                            uiState = uiState.copy(penAndTools = true)
+                                            if (!isRecording) {
+                                                previewOverlayManager.showPenOverlay()
+                                            }
+                                            showToast("Pen & Tools enabled")
+                                        }
                                     } else {
-                                        uiState = uiState.copy(penAndTools = enabled)
-                                        showToast(if (enabled) "Pen & Tools enabled" else "Pen & Tools disabled")
+                                        uiState = uiState.copy(penAndTools = false)
+                                        previewOverlayManager.hidePenOverlay()
+                                        showToast("Pen & Tools disabled")
                                     }
                                 },
                                 onToggleFacecam = { enabled ->
@@ -322,15 +401,35 @@ fun RecoraApp() {
                                             cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
                                         } else {
                                             uiState = uiState.copy(facecam = true)
+                                            if (!isRecording) {
+                                                previewOverlayManager.showFacecamOverlay()
+                                            }
                                             showToast("Facecam enabled")
                                         }
                                     } else {
                                         uiState = uiState.copy(facecam = false)
+                                        previewOverlayManager.hideFacecamOverlay()
                                         showToast("Facecam disabled")
                                     }
                                 },
                                 onToggleTouches = {
-                                    showTouchSetupDialog = true
+                                    val currentlyOn = try {
+                                        Settings.System.getInt(context.contentResolver, "show_touches", 0) == 1
+                                    } catch (e: Exception) {
+                                        false
+                                    }
+                                    if (Settings.System.canWrite(context)) {
+                                        try {
+                                            Settings.System.putInt(context.contentResolver, "show_touches", if (currentlyOn) 0 else 1)
+                                            val newState = !currentlyOn
+                                            uiState = uiState.copy(showTouches = newState)
+                                            showToast(if (newState) "Touches enabled" else "Touches disabled")
+                                        } catch (e: Exception) {
+                                            showTouchSetupDialog = true
+                                        }
+                                    } else {
+                                        showTouchSetupDialog = true
+                                    }
                                 },
                                 onStartRecordingClick = {
                                     if (isRecording) {

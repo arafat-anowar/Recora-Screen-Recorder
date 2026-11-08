@@ -9,7 +9,9 @@ class OverlayManager(
     private val onStopRecording: () -> Unit,
     private val onPauseResume: (isPaused: Boolean) -> Unit,
     private val onScreenshot: () -> Unit,
-    private val onMicMute: (isMuted: Boolean) -> Unit
+    private val onMicMute: (isMuted: Boolean) -> Unit,
+    private val onPenClosed: (() -> Unit)? = null,
+    private val onFacecamClosed: (() -> Unit)? = null
 ) {
     private var controlsOverlay: FloatingControlsOverlay? = null
     private var penOverlay: PenToolsOverlay? = null
@@ -52,6 +54,7 @@ class OverlayManager(
         if (penOverlay == null) {
             penOverlay = PenToolsOverlay(context) {
                 penOverlay = null
+                onPenClosed?.invoke()
             }
         }
         penOverlay?.show()
@@ -67,6 +70,7 @@ class OverlayManager(
         if (facecamOverlay == null) {
             facecamOverlay = FacecamOverlay(context) {
                 facecamOverlay = null
+                onFacecamClosed?.invoke()
             }
         }
         facecamOverlay?.show()
