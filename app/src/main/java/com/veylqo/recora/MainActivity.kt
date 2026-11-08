@@ -258,10 +258,7 @@ fun RecoraApp() {
     ) { granted ->
         if (granted) {
             uiState = uiState.copy(facecam = true)
-            if (!isRecording) {
-                previewOverlayManager.showFacecamOverlay()
-            }
-            showToast("Facecam enabled")
+            showToast("Facecam: ON")
         } else {
             showToast("Camera permission required for Facecam")
         }
@@ -363,6 +360,10 @@ fun RecoraApp() {
     }
 
     fun requestRecordingStart() {
+        if (!Settings.canDrawOverlays(context)) {
+            showOverlayPermissionDialog = true
+            return
+        }
         val neededPermissions = mutableListOf<String>()
         if (uiState.audioSource != AudioSource.None) {
             if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
@@ -426,15 +427,11 @@ fun RecoraApp() {
                                             showOverlayPermissionDialog = true
                                         } else {
                                             uiState = uiState.copy(floatingControls = true)
-                                            if (!isRecording) {
-                                                previewOverlayManager.showControlsOverlay()
-                                            }
-                                            showToast("Floating Controls enabled")
+                                            showToast("Floating Controls: ON")
                                         }
                                     } else {
                                         uiState = uiState.copy(floatingControls = false)
-                                        previewOverlayManager.hideControlsOverlay()
-                                        showToast("Floating Controls disabled")
+                                        showToast("Floating Controls: OFF")
                                     }
                                 },
                                 onTogglePen = { enabled ->
@@ -443,15 +440,11 @@ fun RecoraApp() {
                                             showOverlayPermissionDialog = true
                                         } else {
                                             uiState = uiState.copy(penAndTools = true)
-                                            if (!isRecording) {
-                                                previewOverlayManager.showPenOverlay()
-                                            }
-                                            showToast("Pen & Tools enabled")
+                                            showToast("Pen & Tools: ON")
                                         }
                                     } else {
                                         uiState = uiState.copy(penAndTools = false)
-                                        previewOverlayManager.hidePenOverlay()
-                                        showToast("Pen & Tools disabled")
+                                        showToast("Pen & Tools: OFF")
                                     }
                                 },
                                 onToggleFacecam = { enabled ->
@@ -462,15 +455,11 @@ fun RecoraApp() {
                                             cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
                                         } else {
                                             uiState = uiState.copy(facecam = true)
-                                            if (!isRecording) {
-                                                previewOverlayManager.showFacecamOverlay()
-                                            }
-                                            showToast("Facecam enabled")
+                                            showToast("Facecam: ON")
                                         }
                                     } else {
                                         uiState = uiState.copy(facecam = false)
-                                        previewOverlayManager.hideFacecamOverlay()
-                                        showToast("Facecam disabled")
+                                        showToast("Facecam: OFF")
                                     }
                                 },
                                 onToggleTouches = {

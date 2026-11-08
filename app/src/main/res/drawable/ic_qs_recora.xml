@@ -4,49 +4,54 @@
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
+
     <!-- Outer Circular Ring matching reference design -->
     <path
         android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="1.7"
+        android:strokeWidth="1.8"
         android:strokeLineCap="round"
         android:pathData="M12,12m-9.5,0a9.5,9.5 0 1,0 19,0a9.5,9.5 0 1,0 -19,0" />
 
-    <!-- 4 Framing Corner Brackets around camera -->
+    <!-- 4 Thick Rounded Framing Corner Brackets around camera -->
     <!-- Top-Left Bracket -->
     <path
         android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="1.4"
+        android:strokeWidth="1.8"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
-        android:pathData="M7,9.2 L7,7.2 L9,7.2" />
+        android:pathData="M 6.5,9.8 C 6.5,8.0 7.8,6.6 9.8,6.6" />
+
     <!-- Top-Right Bracket -->
     <path
         android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="1.4"
+        android:strokeWidth="1.8"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
-        android:pathData="M15,7.2 L17,7.2 L17,9.2" />
+        android:pathData="M 14.2,6.6 C 16.2,6.6 17.5,8.0 17.5,9.8" />
+
     <!-- Bottom-Left Bracket -->
     <path
         android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="1.4"
+        android:strokeWidth="1.8"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
-        android:pathData="M7,14.8 L7,16.8 L9,16.8" />
+        android:pathData="M 6.5,14.2 C 6.5,16.0 7.8,17.4 9.8,17.4" />
+
     <!-- Bottom-Right Bracket -->
     <path
         android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="1.4"
+        android:strokeWidth="1.8"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
-        android:pathData="M15,16.8 L17,16.8 L17,14.8" />
+        android:pathData="M 14.2,17.4 C 16.2,17.4 17.5,16.0 17.5,14.2" />
 
-    <!-- Video Camera Body -->
+    <!-- Video Camera Rounded Rectangle Body -->
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M9,9.5 L13,9.5 C13.6,9.5 14,9.9 14,10.5 L14,13.5 C14,14.1 13.6,14.5 13,14.5 L9,14.5 C8.4,14.5 8,14.1 8,13.5 L8,10.5 C8,9.9 8.4,9.5 9,9.5 Z" />
-    <!-- Video Camera Lens Triangle -->
+        android:pathData="M 9.2,9.6 L 13.8,9.6 C 14.5,9.6 15.0,10.1 15.0,10.8 L 15.0,13.2 C 15.0,13.9 14.5,14.4 13.8,14.4 L 9.2,14.4 C 8.5,14.4 8.0,13.9 8.0,13.2 L 8.0,10.8 C 8.0,10.1 8.5,9.6 9.2,9.6 Z" />
+
+    <!-- Video Camera Lens Triangle with Smooth Rounded Vertices -->
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M14.5,11.2 L16.8,9.8 C17.1,9.6 17.5,9.8 17.5,10.2 L17.5,13.8 C17.5,14.2 17.1,14.4 16.8,14.2 L14.5,12.8 Z" />
+        android:pathData="M 15.4,11.0 L 17.4,9.6 C 17.8,9.3 18.4,9.6 18.4,10.1 L 18.4,13.9 C 18.4,14.4 17.8,14.7 17.4,14.4 L 15.4,13.0 Z" />
 </vector>

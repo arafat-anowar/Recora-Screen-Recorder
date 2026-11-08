@@ -30,7 +30,8 @@ class OverlayManager(
                 onPauseResumeClick = onPauseResume,
                 onPenToggleClick = { togglePenOverlay() },
                 onScreenshotClick = onScreenshot,
-                onMicMuteClick = onMicMute
+                onMicMuteClick = onMicMute,
+                onFacecamToggleClick = { toggleFacecamOverlay() }
             )
         }
         controlsOverlay?.show()
@@ -63,6 +64,14 @@ class OverlayManager(
     fun hidePenOverlay() {
         penOverlay?.remove()
         penOverlay = null
+    }
+
+    fun toggleFacecamOverlay() {
+        if (facecamOverlay == null) {
+            showFacecamOverlay()
+        } else {
+            hideFacecamOverlay()
+        }
     }
 
     fun showFacecamOverlay() {

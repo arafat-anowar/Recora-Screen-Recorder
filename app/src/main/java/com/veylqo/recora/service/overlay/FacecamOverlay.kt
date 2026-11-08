@@ -24,6 +24,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
+import com.veylqo.recora.R
 import kotlin.math.abs
 
 class FacecamOverlay(
@@ -73,7 +74,7 @@ class FacecamOverlay(
         ).apply {
             gravity = Gravity.TOP or Gravity.START
             x = (24 * density).toInt()
-            y = (200 * density).toInt()
+            y = (180 * density).toInt()
         }
 
         val container = LinearLayout(context).apply {
@@ -99,7 +100,7 @@ class FacecamOverlay(
 
         // Action 1: Rotate Button (🔄)
         val rotateBtn = createExternalToolButton(
-            iconRes = android.R.drawable.ic_menu_rotate,
+            iconRes = R.drawable.ic_control_rotate,
             density = density
         ) {
             currentRotationDegrees = (currentRotationDegrees + 90f) % 360f
@@ -109,7 +110,7 @@ class FacecamOverlay(
 
         // Action 2: Camera Switch Button (📷⇄)
         val switchBtn = createExternalToolButton(
-            iconRes = android.R.drawable.ic_menu_camera,
+            iconRes = R.drawable.ic_control_switch_cam,
             density = density
         ) {
             isFrontCamera = !isFrontCamera
@@ -117,9 +118,9 @@ class FacecamOverlay(
         }
         toolbar.addView(switchBtn)
 
-        // Action 3: Kata / Close Button (✖️)
+        // Action 3: Kata / Close Button (✕)
         val closeBtn = createExternalToolButton(
-            iconRes = android.R.drawable.ic_menu_close_clear_cancel,
+            iconRes = R.drawable.ic_control_close,
             density = density
         ) {
             remove()
@@ -181,7 +182,6 @@ class FacecamOverlay(
                     initialTouchX = event.rawX
                     initialTouchY = event.rawY
 
-                    // Double-tap on bubble to resize (Small, Medium, Large)
                     val now = System.currentTimeMillis()
                     if (now - lastClickTime < 320) {
                         currentSizeIndex = (currentSizeIndex + 1) % SIZES_DP.size

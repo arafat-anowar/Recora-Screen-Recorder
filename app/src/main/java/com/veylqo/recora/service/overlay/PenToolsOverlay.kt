@@ -15,10 +15,13 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.veylqo.recora.R
 import java.util.Stack
+import kotlin.math.abs
 
 class PenToolsOverlay(
     private val context: Context,
@@ -42,6 +45,10 @@ class PenToolsOverlay(
 
     private val STROKE_WIDTHS = listOf(6f, 14f, 26f)
     private var strokeIndex = 1
+
+    private var expandedContainer: LinearLayout? = null
+    private var collapsedBubble: View? = null
+    private var isExpanded = true
 
     @SuppressLint("ClickableViewAccessibility")
     fun show() {
@@ -85,12 +92,24 @@ class PenToolsOverlay(
         }
         toolbarParams = tParams
 
-        val toolbar = createToolbarView(density, tParams)
-        toolbarView = toolbar
+        val root = FrameLayout(context)
+
+        // Expanded Toolbar
+        val expanded = createToolbarView(density, tParams, root)
+        expandedContainer = expanded
+        root.addView(expanded)
+
+        // Collapsed Pencil Bubble
+        val bubble = createCollapsedBubble(density, tParams, root)
+        collapsedBubble = bubble
+        bubble.visibility = View.GONE
+        root.addView(bubble)
+
+        toolbarView = root
 
         try {
             windowManager.addView(canvas, cParams)
-            windowManager.addView(toolbar, tParams)
+            windowManager.addView(root, tParams)
         } catch (e: Exception) {
             remove()
         }
@@ -121,68 +140,59 @@ class PenToolsOverlay(
         }
     }
 
+    private fun toggleExpandCollapse() {
+        isExpanded = !isExpanded
+        if (isExpanded) {
+            collapsedBubble?.visibility = View.GONE
+            expandedContainer?.visibility = View.VISIBLE
+        } else {
+            expandedContainer?.visibility = View.GONE
+            collapsedBubble?.visibility = View.VISIBLE
+        }
+        toolbarView?.let { root ->
+            toolbarParams?.let { params ->
+                try { windowManager.updateViewLayout(root, params) } catch (e: Exception) {}
+            }
+        }
+    }
+
     @SuppressLint("ClickableViewAccessibility")
-    private fun createToolbarView(density: Float, tParams: WindowManager.LayoutParams): View {
+    private fun createToolbarView(density: Float, tParams: WindowManager.LayoutParams, root: View): LinearLayout {
         val container = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
-            setPadding((10 * density).toInt(), (7 * density).toInt(), (10 * density).toInt(), (7 * density).toInt())
+            setPadding((10 * density).toInt(), (6 * density).toInt(), (10 * density).toInt(), (6 * density).toInt())
             background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
                 cornerRadius = 32 * density
                 setColor(Color.parseColor("#F2141029"))
                 setStroke((1.5f * density).toInt(), Color.parseColor("#7F5AF0"))
             }
-            elevation = 30f
+            elevation = 32f
             gravity = Gravity.CENTER_VERTICAL
         }
 
-        // 1. Drag Handle
+        // Drag Handle
         val dragHandle = TextView(context).apply {
-            text = "⋮⋮"
-            setTextColor(Color.parseColor("#A58BFF"))
-            textSize = 15f
-            setPadding((2 * density).toInt(), 0, (6 * density).toInt(), 0)
+            text = "⠿"
+            setTextColor(Color.parseColor("#B8A7FF"))
+            textSize = 18f
+            setPadding((4 * density).toInt(), 0, (6 * density).toInt(), 0)
         }
         container.addView(dragHandle)
+        attachDragListener(dragHandle, tParams, root)
 
-        var initialX = 0
-        var initialY = 0
-        var initialTouchX = 0f
-        var initialTouchY = 0f
-
-        dragHandle.setOnTouchListener { _, event ->
-            when (event.action) {
-                MotionEvent.ACTION_DOWN -> {
-                    initialX = tParams.x
-                    initialY = tParams.y
-                    initialTouchX = event.rawX
-                    initialTouchY = event.rawY
-                    true
-                }
-                MotionEvent.ACTION_MOVE -> {
-                    val dx = (event.rawX - initialTouchX).toInt()
-                    val dy = (event.rawY - initialTouchY).toInt()
-                    tParams.x = initialX + dx
-                    tParams.y = initialY + dy
-                    try { windowManager.updateViewLayout(container, tParams) } catch (e: Exception) {}
-                    true
-                }
-                else -> false
-            }
-        }
-
-        // 2. Mode Switch: Draw Mode (✏️) vs Touch Screen Mode (👆)
-        val modeBtn = createIconButton(android.R.drawable.ic_menu_edit, active = true, density) { view ->
+        // Mode Switch: Draw Mode (✏️) vs Screen Pass-through Mode (👆)
+        val modeBtn = createIconButton(R.drawable.ic_control_pen, active = true, density) { view ->
             isTouchThrough = !isTouchThrough
             setTouchThroughMode(isTouchThrough)
             (view as ImageView).setImageResource(
-                if (isTouchThrough) android.R.drawable.ic_input_get else android.R.drawable.ic_menu_edit
+                if (isTouchThrough) R.drawable.ic_control_touch else R.drawable.ic_control_pen
             )
-            view.alpha = if (isTouchThrough) 0.5f else 1.0f
+            view.alpha = if (isTouchThrough) 0.55f else 1.0f
         }
         container.addView(modeBtn)
 
-        // 3. Color Dots
+        // Color Dots (Purple, Pink, Gold, Cyan, White)
         val purpleDot = createColorDot(Color.parseColor("#7F5AF0"), density)
         val pinkDot = createColorDot(Color.parseColor("#F0446A"), density)
         val goldDot = createColorDot(Color.parseColor("#FFD21F"), density)
@@ -195,7 +205,7 @@ class PenToolsOverlay(
             currentColor = color
             isEraser = false
             setTouchThroughMode(false)
-            modeBtn.setImageResource(android.R.drawable.ic_menu_edit)
+            modeBtn.setImageResource(R.drawable.ic_control_pen)
             modeBtn.alpha = 1.0f
             dots.forEach { d ->
                 (d.background as GradientDrawable).setStroke(
@@ -215,25 +225,25 @@ class PenToolsOverlay(
 
         dots.forEach { container.addView(it) }
 
-        // 4. Stroke Thickness Toggle Button
-        val strokeBtn = createIconButton(android.R.drawable.presence_online, active = false, density) { view ->
+        // Stroke Thickness Toggle Button
+        val strokeBtn = createIconButton(R.drawable.ic_control_pen, active = false, density) { view ->
             strokeIndex = (strokeIndex + 1) % STROKE_WIDTHS.size
             currentStrokeWidth = STROKE_WIDTHS[strokeIndex]
             val scale = when (strokeIndex) {
-                0 -> 0.7f
+                0 -> 0.75f
                 1 -> 1.0f
-                else -> 1.4f
+                else -> 1.35f
             }
             view.scaleX = scale
             view.scaleY = scale
         }
         container.addView(strokeBtn)
 
-        // 5. Eraser Button
-        val eraserBtn = createIconButton(android.R.drawable.ic_menu_delete, active = false, density) { view ->
+        // Eraser Button
+        val eraserBtn = createIconButton(R.drawable.ic_control_eraser, active = false, density) { view ->
             isEraser = !isEraser
             setTouchThroughMode(false)
-            modeBtn.setImageResource(android.R.drawable.ic_menu_edit)
+            modeBtn.setImageResource(R.drawable.ic_control_pen)
             modeBtn.alpha = 1.0f
             view.alpha = if (isEraser) 1.0f else 0.45f
             if (isEraser) {
@@ -243,23 +253,131 @@ class PenToolsOverlay(
         eraserBtn.alpha = 0.45f
         container.addView(eraserBtn)
 
-        // 6. Undo Button
-        container.addView(createIconButton(android.R.drawable.ic_menu_revert, active = false, density) {
+        // Undo Button
+        container.addView(createIconButton(R.drawable.ic_control_undo, active = false, density) {
             canvasView?.undo()
         })
 
-        // 7. Clear All Button
-        container.addView(createIconButton(android.R.drawable.ic_menu_close_clear_cancel, active = false, density) {
+        // Clear All Button
+        container.addView(createIconButton(R.drawable.ic_control_clear, active = false, density) {
             canvasView?.clear()
         })
 
-        // 8. Close Button
-        container.addView(createIconButton(android.R.drawable.ic_lock_power_off, active = false, density) {
+        // Minimize Button (›)
+        val minBtn = TextView(context).apply {
+            text = "›"
+            textSize = 20f
+            setTextColor(Color.parseColor("#B8A7FF"))
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            setPadding((6 * density).toInt(), 0, (6 * density).toInt(), 0)
+            isClickable = true
+            setOnClickListener { toggleExpandCollapse() }
+        }
+        container.addView(minBtn)
+
+        // Close Button (✕)
+        container.addView(createIconButton(R.drawable.ic_control_close, active = false, density) {
             remove()
             onCloseClick()
         })
 
         return container
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    private fun createCollapsedBubble(density: Float, tParams: WindowManager.LayoutParams, root: View): View {
+        val bubbleSize = (44 * density).toInt()
+
+        val bubble = FrameLayout(context).apply {
+            layoutParams = FrameLayout.LayoutParams(bubbleSize, bubbleSize)
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.parseColor("#F2141029"))
+                setStroke((2 * density).toInt(), Color.parseColor("#7F5AF0"))
+            }
+            elevation = 32f
+        }
+
+        val penIcon = ImageView(context).apply {
+            setImageResource(R.drawable.ic_control_pen)
+            setColorFilter(Color.parseColor("#B8A7FF"))
+            val pad = (11 * density).toInt()
+            setPadding(pad, pad, pad, pad)
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        }
+        bubble.addView(penIcon)
+
+        var initialX = 0
+        var initialY = 0
+        var initialTouchX = 0f
+        var initialTouchY = 0f
+        var hasMoved = false
+
+        bubble.setOnTouchListener { _, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    initialX = tParams.x
+                    initialY = tParams.y
+                    initialTouchX = event.rawX
+                    initialTouchY = event.rawY
+                    hasMoved = false
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = (event.rawX - initialTouchX).toInt()
+                    val dy = (event.rawY - initialTouchY).toInt()
+                    if (abs(dx) > 10 || abs(dy) > 10) {
+                        hasMoved = true
+                        tParams.x = initialX + dx
+                        tParams.y = initialY + dy
+                        try { windowManager.updateViewLayout(root, tParams) } catch (e: Exception) {}
+                    }
+                    true
+                }
+                MotionEvent.ACTION_UP -> {
+                    if (!hasMoved) {
+                        toggleExpandCollapse()
+                    }
+                    true
+                }
+                else -> false
+            }
+        }
+
+        return bubble
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    private fun attachDragListener(view: View, tParams: WindowManager.LayoutParams, root: View) {
+        var initialX = 0
+        var initialY = 0
+        var initialTouchX = 0f
+        var initialTouchY = 0f
+
+        view.setOnTouchListener { _, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    initialX = tParams.x
+                    initialY = tParams.y
+                    initialTouchX = event.rawX
+                    initialTouchY = event.rawY
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = (event.rawX - initialTouchX).toInt()
+                    val dy = (event.rawY - initialTouchY).toInt()
+                    tParams.x = initialX + dx
+                    tParams.y = initialY + dy
+                    try { windowManager.updateViewLayout(root, tParams) } catch (e: Exception) {}
+                    true
+                }
+                else -> false
+            }
+        }
     }
 
     private fun createColorDot(color: Int, density: Float): View {

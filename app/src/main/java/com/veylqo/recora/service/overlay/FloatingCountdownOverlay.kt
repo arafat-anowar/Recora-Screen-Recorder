@@ -19,7 +19,7 @@ import android.widget.TextView
 class FloatingCountdownOverlay(private val context: Context) {
 
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-    private var rootLayout: FrameLayout? = null
+    private var rootLayout: View? = null
     private val mainHandler = Handler(Looper.getMainLooper())
     private var countdownRunnable: Runnable? = null
 
@@ -34,9 +34,10 @@ class FloatingCountdownOverlay(private val context: Context) {
         val density = context.resources.displayMetrics.density
         var remaining = if (initialSeconds <= 0) 3 else initialSeconds
 
+        // Center floating card window: DOES NOT cover the home screen with dark scrim!
         val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             } else {
@@ -45,60 +46,54 @@ class FloatingCountdownOverlay(private val context: Context) {
             },
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
-        )
-
-        // Semi-transparent cosmic scrim so the mobile home screen is visible underneath!
-        val root = FrameLayout(context).apply {
-            setBackgroundColor(Color.parseColor("#990A0818"))
-        }
-
-        // Top Header
-        val header = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding((28 * density).toInt(), (52 * density).toInt(), 0, 0)
-        }
-        val appTitle = TextView(context).apply {
-            text = "Recora"
-            textSize = 28f
-            setTextColor(Color.WHITE)
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
-        }
-        val subTitle = TextView(context).apply {
-            text = "Starting soon"
-            textSize = 14f
-            setTextColor(Color.parseColor("#B6B0D4"))
-        }
-        header.addView(appTitle)
-        header.addView(subTitle)
-        root.addView(header)
-
-        // Center Column: Ring + Text + Cancel Button
-        val centerCol = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
+        ).apply {
             gravity = Gravity.CENTER
-            layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                gravity = Gravity.CENTER
-            }
         }
 
-        // 240dp Circular Ring
-        val ringSize = (240 * density).toInt()
+        // Floating Dark Glass Card Container
+        val card = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            val padHoriz = (24 * density).toInt()
+            val padVert = (20 * density).toInt()
+            setPadding(padHoriz, padVert, padHoriz, padVert)
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = 32 * density
+                setColor(Color.parseColor("#EE141029"))
+                setStroke((1.5f * density).toInt(), Color.parseColor("#7F5AF0"))
+            }
+            elevation = 36f
+        }
+
+        // Top Tag: "Recora · Starting"
+        val topTag = TextView(context).apply {
+            text = "Recora · Starting in"
+            textSize = 13f
+            setTextColor(Color.parseColor("#B8A7FF"))
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, (14 * density).toInt())
+        }
+        card.addView(topTag)
+
+        // Glowing Purple Outer Ring
+        val ringSize = (110 * density).toInt()
         val ring = FrameLayout(context).apply {
-            layoutParams = LinearLayout.LayoutParams(ringSize, ringSize)
+            layoutParams = LinearLayout.LayoutParams(ringSize, ringSize).apply {
+                gravity = Gravity.CENTER_HORIZONTAL
+            }
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(Color.TRANSPARENT)
-                setStroke((5 * density).toInt(), Color.parseColor("#7F5AF0"))
+                setColor(Color.parseColor("#261D4D"))
+                setStroke((4 * density).toInt(), Color.parseColor("#7F5AF0"))
             }
         }
 
-        // Center Number
+        // Center Countdown Number
         val numberText = TextView(context).apply {
             text = "$remaining"
-            textSize = 86f
+            textSize = 52f
             setTextColor(Color.WHITE)
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
@@ -108,32 +103,30 @@ class FloatingCountdownOverlay(private val context: Context) {
             )
         }
         ring.addView(numberText)
-        centerCol.addView(ring)
-
-        // Status Text: "Recording starts in 3..."
-        val statusText = TextView(context).apply {
-            text = "Recording starts in $remaining..."
-            textSize = 16f
-            setTextColor(Color.WHITE)
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
-            gravity = Gravity.CENTER
-            setPadding(0, (32 * density).toInt(), 0, (24 * density).toInt())
-        }
-        centerCol.addView(statusText)
+        card.addView(ring)
 
         // Cancel Button Centered Underneath
         val cancelBtn = TextView(context).apply {
             text = "Cancel"
-            textSize = 14f
+            textSize = 13f
             setTextColor(Color.WHITE)
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
-            setPadding((44 * density).toInt(), (12 * density).toInt(), (44 * density).toInt(), (12 * density).toInt())
+            val btnPadH = (28 * density).toInt()
+            val btnPadV = (8 * density).toInt()
+            setPadding(btnPadH, btnPadV, btnPadH, btnPadV)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = (16 * density).toInt()
+                gravity = Gravity.CENTER_HORIZONTAL
+            }
             background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
-                cornerRadius = 32 * density
-                setColor(Color.parseColor("#CC141029"))
-                setStroke((1.2f * density).toInt(), Color.parseColor("#2A2352"))
+                cornerRadius = 20 * density
+                setColor(Color.parseColor("#33FFFFFF"))
+                setStroke((1f * density).toInt(), Color.parseColor("#55FFFFFF"))
             }
             isClickable = true
             isFocusable = false
@@ -142,41 +135,38 @@ class FloatingCountdownOverlay(private val context: Context) {
                 onCancel()
             }
         }
-        centerCol.addView(cancelBtn)
+        card.addView(cancelBtn)
 
-        root.addView(centerCol)
-        rootLayout = root
+        rootLayout = card
 
         try {
-            windowManager.addView(root, params)
+            windowManager.addView(card, params)
         } catch (e: Exception) {
             remove()
             onComplete()
             return
         }
 
-        // Countdown Ticker Loop with Scale Pulse Animation on Ring
+        // Ticker loop
         val ticker = object : Runnable {
             override fun run() {
                 if (remaining > 1) {
                     remaining--
                     numberText.text = "$remaining"
-                    statusText.text = "Recording starts in $remaining..."
 
-                    // Scale pulse animation
-                    ring.scaleX = 1.12f
-                    ring.scaleY = 1.12f
+                    // Pulse ring on each tick
+                    ring.scaleX = 1.15f
+                    ring.scaleY = 1.15f
                     ring.animate()
                         .scaleX(1.0f)
                         .scaleY(1.0f)
-                        .setDuration(350)
+                        .setDuration(320)
                         .setInterpolator(OvershootInterpolator())
                         .start()
 
                     countdownRunnable = this
                     mainHandler.postDelayed(this, 1000)
                 } else {
-                    // Countdown complete!
                     remove()
                     onComplete()
                 }
