@@ -281,6 +281,7 @@ fun RecoraApp() {
             putExtra(RecordingService.EXTRA_WIDTH, finalW)
             putExtra(RecordingService.EXTRA_HEIGHT, finalH)
             putExtra(RecordingService.EXTRA_FPS, fpsVal)
+            putExtra(RecordingService.EXTRA_BITRATE, uiState.bitrate.bps)
             putExtra(RecordingService.EXTRA_QUALITY_LABEL, "${uiState.resolution.label} · ${uiState.fps.label}")
             putExtra(RecordingService.EXTRA_AUDIO_LABEL, uiState.audioSource.displayName)
             putExtra(RecordingService.EXTRA_ENABLE_CONTROLS, uiState.floatingControls)
@@ -583,10 +584,12 @@ fun RecoraApp() {
                 QualityPickerSheet(
                     selectedResolution = uiState.resolution,
                     selectedFps = uiState.fps,
+                    selectedBitrate = uiState.bitrate,
                     isProUser = uiState.isProUser,
                     nativeResolutionText = "${minOf(nativeW, nativeH)} × ${maxOf(nativeW, nativeH)} (Native 1:1)",
                     onSelectResolution = { uiState = uiState.copy(resolution = it) },
                     onSelectFps = { uiState = uiState.copy(fps = it) },
+                    onSelectBitrate = { uiState = uiState.copy(bitrate = it) },
                     onShowPlan = { showPlanSheet = true },
                     onDismiss = { showQualitySheet = false }
                 )

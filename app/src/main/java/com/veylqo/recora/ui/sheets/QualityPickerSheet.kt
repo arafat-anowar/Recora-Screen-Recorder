@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.veylqo.recora.data.model.VideoBitrate
 import com.veylqo.recora.data.model.VideoFps
 import com.veylqo.recora.data.model.VideoResolution
 import com.veylqo.recora.ui.theme.CardBg
@@ -36,17 +37,19 @@ import com.veylqo.recora.ui.theme.TextPrimary
 fun QualityPickerSheet(
     selectedResolution: VideoResolution,
     selectedFps: VideoFps,
+    selectedBitrate: VideoBitrate,
     isProUser: Boolean,
     nativeResolutionText: String = "Screen 1:1 match",
     onSelectResolution: (VideoResolution) -> Unit,
     onSelectFps: (VideoFps) -> Unit,
+    onSelectBitrate: (VideoBitrate) -> Unit,
     onShowPlan: () -> Unit,
     onDismiss: () -> Unit
 ) {
     RecoraBottomSheet(
         onDismissRequest = onDismiss,
         title = "Recording Quality",
-        subtitle = "Choose capture resolution and framerate"
+        subtitle = "Choose capture resolution, framerate and bitrate"
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             // Resolution Section
@@ -80,7 +83,7 @@ fun QualityPickerSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
             // Framerate Section
             Text(
@@ -119,6 +122,78 @@ fun QualityPickerSheet(
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Bitrate Section
+            Text(
+                text = "BITRATE",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = TextMuted,
+                letterSpacing = 1.sp
+            )
+
+            val bitrates = VideoBitrate.entries
+            val row1 = bitrates.take(3)
+            val row2 = bitrates.drop(3)
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    row1.forEach { b ->
+                        BitrateChip(
+                            bitrate = b,
+                            isSelected = selectedBitrate == b,
+                            onSelect = { onSelectBitrate(b) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    row2.forEach { b ->
+                        BitrateChip(
+                            bitrate = b,
+                            isSelected = selectedBitrate == b,
+                            onSelect = { onSelectBitrate(b) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
         }
+    }
+}
+
+@Composable
+private fun BitrateChip(
+    bitrate: VideoBitrate,
+    isSelected: Boolean,
+    onSelect: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val bgColor = if (isSelected) PrimaryPurple.copy(alpha = 0.15f) else CardBg
+    val borderColor = if (isSelected) PrimaryPurple else CardBorder
+
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(bgColor)
+            .border(1.dp, borderColor, RoundedCornerShape(14.dp))
+            .clickable { onSelect() }
+            .padding(vertical = 12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = bitrate.label,
+            fontSize = 13.sp,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+            color = if (isSelected) Color.White else TextPrimary
+        )
     }
 }

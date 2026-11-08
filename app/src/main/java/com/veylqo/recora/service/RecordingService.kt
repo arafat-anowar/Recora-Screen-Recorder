@@ -68,6 +68,7 @@ class RecordingService : Service() {
         const val EXTRA_WIDTH = "extra_width"
         const val EXTRA_HEIGHT = "extra_height"
         const val EXTRA_FPS = "extra_fps"
+        const val EXTRA_BITRATE = "extra_bitrate"
         const val EXTRA_QUALITY_LABEL = "extra_quality_label"
         const val EXTRA_AUDIO_LABEL = "extra_audio_label"
         const val EXTRA_TARGET_URI = "extra_target_uri"
@@ -134,6 +135,7 @@ class RecordingService : Service() {
                 val width = intent.getIntExtra(EXTRA_WIDTH, 1080)
                 val height = intent.getIntExtra(EXTRA_HEIGHT, 1920)
                 val fps = intent.getIntExtra(EXTRA_FPS, 60)
+                val bitrate = intent.getIntExtra(EXTRA_BITRATE, 0)
                 val enableControls = intent.getBooleanExtra(EXTRA_ENABLE_CONTROLS, false)
                 val enablePen = intent.getBooleanExtra(EXTRA_ENABLE_PEN, false)
                 val enableFacecam = intent.getBooleanExtra(EXTRA_ENABLE_FACECAM, false)
@@ -141,7 +143,7 @@ class RecordingService : Service() {
                 audioLabel = intent.getStringExtra(EXTRA_AUDIO_LABEL) ?: audioSource.displayName
 
                 if (resultData != null && resultCode != 0) {
-                    startRecordingSession(resultCode, resultData, audioSource, width, height, fps, enableControls, enablePen, enableFacecam)
+                    startRecordingSession(resultCode, resultData, audioSource, width, height, fps, bitrate, enableControls, enablePen, enableFacecam)
                 } else {
                     Log.e(TAG, "Cannot start recording: Missing MediaProjection permission data")
                     stopSelf()
@@ -171,6 +173,7 @@ class RecordingService : Service() {
         reqWidth: Int,
         reqHeight: Int,
         reqFps: Int,
+        reqBitrate: Int,
         enableControls: Boolean,
         enablePen: Boolean,
         enableFacecam: Boolean
@@ -262,7 +265,8 @@ class RecordingService : Service() {
                 recorder.setOutputFile(fileDescriptor!!.fileDescriptor)
                 recorder.setVideoSize(profile.width, profile.height)
                 recorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264)
-                recorder.setVideoEncodingBitRate(profile.bitrate)
+                val finalBitrate = if (reqBitrate > 0) reqBitrate else profile.bitrate
+                recorder.setVideoEncodingBitRate(finalBitrate)
                 recorder.setVideoFrameRate(profile.fps)
 
                 if (hasAudio) {

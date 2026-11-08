@@ -19,6 +19,15 @@ enum class VideoFps(val label: String) {
     FPS_60("60 fps")
 }
 
+enum class VideoBitrate(val label: String, val bps: Int) {
+    Auto("Auto", 0),
+    Mbps24("24 Mbps", 24_000_000),
+    Mbps16("16 Mbps", 16_000_000),
+    Mbps12("12 Mbps", 12_000_000),
+    Mbps8("8 Mbps", 8_000_000),
+    Mbps5("5 Mbps", 5_000_000)
+}
+
 enum class VideoOrientation(val displayName: String, val subtitle: String) {
     Auto("Auto", "Follows device screen orientation"),
     Portrait("Portrait", "Lock recording to vertical (9:16)"),
@@ -36,6 +45,7 @@ data class RecordUiState(
     val audioSource: AudioSource = AudioSource.Internal,
     val resolution: VideoResolution = VideoResolution.Native,
     val fps: VideoFps = VideoFps.FPS_60,
+    val bitrate: VideoBitrate = VideoBitrate.Auto,
     val orientation: VideoOrientation = VideoOrientation.Auto,
     val timer: CountdownTimer = CountdownTimer.Seconds3,
     val floatingControls: Boolean = true,

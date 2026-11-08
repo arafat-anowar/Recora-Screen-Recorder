@@ -15,6 +15,7 @@ import android.view.ViewOutlineProvider
 import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.ImageView
+import android.widget.LinearLayout
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
@@ -39,7 +40,7 @@ class FacecamOverlay(
     override val lifecycle: Lifecycle get() = lifecycleRegistry
 
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-    private var rootLayout: FrameLayout? = null
+    private var rootLayout: LinearLayout? = null
     private var previewView: PreviewView? = null
     private var cameraProvider: ProcessCameraProvider? = null
 
@@ -59,8 +60,8 @@ class FacecamOverlay(
         val sizePx = (SIZES_DP[currentSizeIndex] * density).toInt()
 
         val params = WindowManager.LayoutParams(
-            sizePx,
-            sizePx,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             } else {
@@ -72,10 +73,69 @@ class FacecamOverlay(
         ).apply {
             gravity = Gravity.TOP or Gravity.START
             x = (24 * density).toInt()
-            y = (240 * density).toInt()
+            y = (200 * density).toInt()
         }
 
-        val frame = FrameLayout(context).apply {
+        val container = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+        }
+
+        // =====================================================================
+        // 1. Sleek Action Bar OUTSIDE the Circle (Rotate, Switch Camera, Kata/Close)
+        // =====================================================================
+        val toolbar = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding((8 * density).toInt(), (4 * density).toInt(), (8 * density).toInt(), (4 * density).toInt())
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = 24 * density
+                setColor(Color.parseColor("#F4141029"))
+                setStroke((1.5f * density).toInt(), Color.parseColor("#7F5AF0"))
+            }
+            elevation = 32f
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
+        // Action 1: Rotate Button (🔄)
+        val rotateBtn = createExternalToolButton(
+            iconRes = android.R.drawable.ic_menu_rotate,
+            density = density
+        ) {
+            currentRotationDegrees = (currentRotationDegrees + 90f) % 360f
+            previewView?.animate()?.rotation(currentRotationDegrees)?.setDuration(220)?.start()
+        }
+        toolbar.addView(rotateBtn)
+
+        // Action 2: Camera Switch Button (📷⇄)
+        val switchBtn = createExternalToolButton(
+            iconRes = android.R.drawable.ic_menu_camera,
+            density = density
+        ) {
+            isFrontCamera = !isFrontCamera
+            previewView?.let { bindCameraPreview(it) }
+        }
+        toolbar.addView(switchBtn)
+
+        // Action 3: Kata / Close Button (✖️)
+        val closeBtn = createExternalToolButton(
+            iconRes = android.R.drawable.ic_menu_close_clear_cancel,
+            density = density
+        ) {
+            remove()
+            onCloseClick()
+        }
+        toolbar.addView(closeBtn)
+
+        container.addView(toolbar)
+
+        // =====================================================================
+        // 2. Pure Clean Circular Camera Bubble (Zero buttons inside covering face!)
+        // =====================================================================
+        val circleFrame = FrameLayout(context).apply {
+            layoutParams = LinearLayout.LayoutParams(sizePx, sizePx).apply {
+                topMargin = (8 * density).toInt()
+            }
             clipToOutline = true
             outlineProvider = object : ViewOutlineProvider() {
                 override fun getOutline(view: View, outline: Outline) {
@@ -90,77 +150,30 @@ class FacecamOverlay(
             elevation = 28f
         }
 
-        // Camera Preview
+        // Camera PreviewView inside the circle
         val preview = PreviewView(context).apply {
             implementationMode = PreviewView.ImplementationMode.COMPATIBLE
             scaleType = PreviewView.ScaleType.FILL_CENTER
             rotation = currentRotationDegrees
         }
         previewView = preview
-        frame.addView(preview, FrameLayout.LayoutParams(
+        circleFrame.addView(preview, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.MATCH_PARENT
         ))
 
-        // Center Drag Area that leaves buttons clickable
-        val dragOverlay = View(context)
-        frame.addView(dragOverlay, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.MATCH_PARENT
-        ))
+        container.addView(circleFrame)
 
-        val btnSize = (28 * density).toInt()
-
-        // 1. Close Button (Top-Right)
-        val closeBtn = createOverlayMiniButton(
-            iconRes = android.R.drawable.ic_menu_close_clear_cancel,
-            density = density
-        ) {
-            remove()
-            onCloseClick()
-        }
-        val closeParams = FrameLayout.LayoutParams(btnSize, btnSize).apply {
-            gravity = Gravity.TOP or Gravity.END
-            setMargins(0, (8 * density).toInt(), (8 * density).toInt(), 0)
-        }
-        frame.addView(closeBtn, closeParams)
-
-        // 2. Rotate Button (Top-Left) - Rotates camera orientation 90 degrees on tap
-        val rotateBtn = createOverlayMiniButton(
-            iconRes = android.R.drawable.ic_menu_rotate,
-            density = density
-        ) {
-            currentRotationDegrees = (currentRotationDegrees + 90f) % 360f
-            previewView?.animate()?.rotation(currentRotationDegrees)?.setDuration(200)?.start()
-        }
-        val rotateParams = FrameLayout.LayoutParams(btnSize, btnSize).apply {
-            gravity = Gravity.TOP or Gravity.START
-            setMargins((8 * density).toInt(), (8 * density).toInt(), 0, 0)
-        }
-        frame.addView(rotateBtn, rotateParams)
-
-        // 3. Switch Camera Button (Bottom-Center) - Front / Back flip
-        val flipBtn = createOverlayMiniButton(
-            iconRes = android.R.drawable.ic_menu_camera,
-            density = density
-        ) {
-            isFrontCamera = !isFrontCamera
-            previewView?.let { bindCameraPreview(it) }
-        }
-        val flipParams = FrameLayout.LayoutParams(btnSize, btnSize).apply {
-            gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-            setMargins(0, 0, 0, (8 * density).toInt())
-        }
-        frame.addView(flipBtn, flipParams)
-
-        // Dragging & Double-tap resizing strictly on dragOverlay
+        // =====================================================================
+        // 3. Smooth Dragging & Double-Tap Resizing across circle and toolbar
+        // =====================================================================
         var initialX = 0
         var initialY = 0
         var initialTouchX = 0f
         var initialTouchY = 0f
         var lastClickTime = 0L
 
-        dragOverlay.setOnTouchListener { _, event ->
+        val dragListener = View.OnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
                     initialX = params.x
@@ -168,16 +181,16 @@ class FacecamOverlay(
                     initialTouchX = event.rawX
                     initialTouchY = event.rawY
 
-                    // Double-tap resize
+                    // Double-tap on bubble to resize (Small, Medium, Large)
                     val now = System.currentTimeMillis()
                     if (now - lastClickTime < 320) {
                         currentSizeIndex = (currentSizeIndex + 1) % SIZES_DP.size
                         val newSizePx = (SIZES_DP[currentSizeIndex] * density).toInt()
-                        params.width = newSizePx
-                        params.height = newSizePx
-                        try {
-                            windowManager.updateViewLayout(frame, params)
-                        } catch (e: Exception) {}
+                        circleFrame.layoutParams = (circleFrame.layoutParams as LinearLayout.LayoutParams).apply {
+                            width = newSizePx
+                            height = newSizePx
+                        }
+                        circleFrame.requestLayout()
                     }
                     lastClickTime = now
                     true
@@ -189,7 +202,7 @@ class FacecamOverlay(
                         params.x = initialX + dx
                         params.y = initialY + dy
                         try {
-                            windowManager.updateViewLayout(frame, params)
+                            windowManager.updateViewLayout(container, params)
                         } catch (e: Exception) {}
                     }
                     true
@@ -198,9 +211,11 @@ class FacecamOverlay(
             }
         }
 
-        rootLayout = frame
+        circleFrame.setOnTouchListener(dragListener)
+
+        rootLayout = container
         try {
-            windowManager.addView(frame, params)
+            windowManager.addView(container, params)
             startCamera(preview)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to add Facecam window", e)
@@ -208,18 +223,22 @@ class FacecamOverlay(
         }
     }
 
-    private fun createOverlayMiniButton(iconRes: Int, density: Float, onClick: () -> Unit): ImageView {
+    private fun createExternalToolButton(iconRes: Int, density: Float, onClick: () -> Unit): ImageView {
+        val btnSize = (32 * density).toInt()
+        val pad = (6 * density).toInt()
+
         return ImageView(context).apply {
             setImageResource(iconRes)
-            val p = (5 * density).toInt()
-            setPadding(p, p, p, p)
+            setPadding(pad, pad, pad, pad)
             setColorFilter(Color.WHITE)
+            layoutParams = LinearLayout.LayoutParams(btnSize, btnSize).apply {
+                setMargins((4 * density).toInt(), 0, (4 * density).toInt(), 0)
+            }
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(Color.parseColor("#CC141029"))
-                setStroke((1 * density).toInt(), Color.parseColor("#7F5AF0"))
+                setColor(Color.parseColor("#221A47"))
             }
-            elevation = 32f
+            elevation = 34f
             isClickable = true
             isFocusable = false
             setOnClickListener { onClick() }
