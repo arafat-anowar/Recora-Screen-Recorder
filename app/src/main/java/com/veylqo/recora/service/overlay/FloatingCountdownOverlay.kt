@@ -55,18 +55,18 @@ class FloatingCountdownOverlay(private val context: Context) {
             gravity = Gravity.CENTER_HORIZONTAL
         }
 
-        // Minimalist Glowing Circular Countdown Badge (92dp)
-        val badgeSize = (92 * density).toInt()
+        // Glowing Neon Red Circular Countdown Badge matching app theme (96dp)
+        val badgeSize = (96 * density).toInt()
         val ring = FrameLayout(context).apply {
             layoutParams = LinearLayout.LayoutParams(badgeSize, badgeSize).apply {
                 gravity = Gravity.CENTER_HORIZONTAL
             }
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(Color.parseColor("#E60D0A1C"))
-                setStroke((4 * density).toInt(), Color.parseColor("#8B5CF6"))
+                setColor(Color.parseColor("#E60A0710"))
+                setStroke((4 * density).toInt(), Color.parseColor("#FF2B54"))
             }
-            elevation = 40f
+            elevation = 0f
         }
 
         // Giant Center Number (3, 2, 1)
@@ -133,16 +133,6 @@ class FloatingCountdownOverlay(private val context: Context) {
                 if (remaining > 1) {
                     remaining--
                     numberText.text = "$remaining"
-
-                    // Punchy scale animation on number and ring
-                    ring.scaleX = 1.25f
-                    ring.scaleY = 1.25f
-                    ring.animate()
-                        .scaleX(1.0f)
-                        .scaleY(1.0f)
-                        .setDuration(280)
-                        .setInterpolator(OvershootInterpolator(1.8f))
-                        .start()
 
                     countdownRunnable = this
                     mainHandler.postDelayed(this, 1000)
