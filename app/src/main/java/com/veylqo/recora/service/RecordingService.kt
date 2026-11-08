@@ -98,6 +98,7 @@ class RecordingService : Service() {
     private var isRecording = false
     private var isPaused = false
     private var durationSeconds = 0
+    private var recordingStartTimeMs = 0L
     private var timerJob: Job? = null
 
     // Pure Internal Audio & Performance Optimization components
@@ -191,7 +192,9 @@ class RecordingService : Service() {
         serviceScope.launch {
             try {
                 // 1. Establish Foreground Service FIRST before using MediaProjection (Android 14+ mandate)
-                val initialNotification = buildRecordingNotification(0, isPaused = false)
+                durationSeconds = 0
+                recordingStartTimeMs = System.currentTimeMillis()
+                val initialNotification = buildRecordingNotification(isPaused = false)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     ServiceCompat.startForeground(
                         this@RecordingService,
@@ -356,7 +359,8 @@ class RecordingService : Service() {
                 mediaRecorder?.pause()
                 isPaused = true
                 timerJob?.cancel()
-                updateNotification()
+                val notification = buildRecordingNotification(isPaused = true)
+                notificationManager.notify(NOTIFICATION_RECORDING_ID, notification)
                 updateState(RecordingStatus.PAUSED)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to pause recording", e)
@@ -369,8 +373,10 @@ class RecordingService : Service() {
             try {
                 mediaRecorder?.resume()
                 isPaused = false
+                recordingStartTimeMs = System.currentTimeMillis() - (durationSeconds * 1000L)
+                val notification = buildRecordingNotification(isPaused = false)
+                notificationManager.notify(NOTIFICATION_RECORDING_ID, notification)
                 startTimer()
-                updateNotification()
                 updateState(RecordingStatus.RECORDING)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to resume recording", e)
@@ -473,29 +479,18 @@ class RecordingService : Service() {
             while (isActive && isRecording && !isPaused) {
                 delay(1000)
                 durationSeconds++
-                updateNotification()
                 _serviceState.value = _serviceState.value.copy(
                     status = RecordingStatus.RECORDING,
                     durationSeconds = durationSeconds,
                     qualityLabel = qualityLabel,
                     audioLabel = audioLabel
                 )
+                // Zero IPC notification spam: Android SystemUI native Chronometer handles ticking with 0 latency & 0 jank!
             }
         }
     }
 
-    private fun updateNotification() {
-        if (isRecording) {
-            val notification = buildRecordingNotification(durationSeconds, isPaused)
-            notificationManager.notify(NOTIFICATION_RECORDING_ID, notification)
-        }
-    }
-
-    private fun buildRecordingNotification(seconds: Int, isPaused: Boolean): Notification {
-        val min = seconds / 60
-        val sec = seconds % 60
-        val timeFormatted = String.format(Locale.US, "%02d:%02d", min, sec)
-
+    private fun buildRecordingNotification(isPaused: Boolean): Notification {
         val openIntent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
@@ -522,13 +517,25 @@ class RecordingService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        return NotificationCompat.Builder(this, CHANNEL_RECORDING_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle("Recording screen · $timeFormatted")
+        val title = if (isPaused) {
+            val min = durationSeconds / 60
+            val sec = durationSeconds % 60
+            String.format(Locale.US, "Recording paused · %02d:%02d", min, sec)
+        } else {
+            "Recording screen"
+        }
+
+        val builder = NotificationCompat.Builder(this, CHANNEL_RECORDING_ID)
+            .setSmallIcon(R.drawable.ic_qs_recora)
+            .setContentTitle(title)
             .setContentText("$audioLabel · $qualityLabel")
             .setContentIntent(openPending)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
+            .setShowWhen(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .addAction(
                 0,
                 if (isPaused) "Resume" else "Pause",
@@ -539,9 +546,16 @@ class RecordingService : Service() {
                 "Stop",
                 stopPending
             )
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setCategory(NotificationCompat.CATEGORY_SERVICE)
-            .build()
+
+        if (!isPaused) {
+            builder.setUsesChronometer(true)
+            builder.setChronometerCountDown(false)
+            builder.setWhen(recordingStartTimeMs)
+        } else {
+            builder.setUsesChronometer(false)
+        }
+
+        return builder.build()
     }
 
     private fun postSavedNotification(uri: Uri, fileName: String, duration: String, size: String) {
@@ -573,7 +587,7 @@ class RecordingService : Service() {
         )
 
         val notification = NotificationCompat.Builder(this, CHANNEL_COMPLETED_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_qs_recora)
             .setContentTitle("Recording saved")
             .setContentText("$fileName · $duration · $size")
             .setContentIntent(openPending)

@@ -145,9 +145,12 @@ class PenToolsOverlay(
         if (isExpanded) {
             collapsedBubble?.visibility = View.GONE
             expandedContainer?.visibility = View.VISIBLE
+            setTouchThroughMode(false)
         } else {
             expandedContainer?.visibility = View.GONE
             collapsedBubble?.visibility = View.VISIBLE
+            // When minimized to bubble, NEVER capture screen gestures or block notification swipe-down!
+            setTouchThroughMode(true)
         }
         toolbarView?.let { root ->
             toolbarParams?.let { params ->
