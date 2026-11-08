@@ -44,6 +44,7 @@ private data class MinimalStar(
 fun GalaxyBackground(
     modifier: Modifier = Modifier,
     reduceMotion: Boolean = false,
+    coreYFraction: Float = 0.30f,
     content: @Composable () -> Unit
 ) {
     // 1. SUBTLE, CALM CELESTIAL STARFIELD (Clean, non-distracting pinprick stars)
@@ -119,8 +120,8 @@ fun GalaxyBackground(
             .drawBehind {
                 val width = size.width
                 val height = size.height
-                // Centered right behind the Record Hero button
-                val core = Offset(width * 0.5f, height * 0.30f)
+                // Centered right behind the Record Hero button or target center
+                val core = Offset(width * 0.5f, height * coreYFraction)
                 val baseRadius = width * 0.85f
 
                 // ==============================================================
