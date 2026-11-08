@@ -44,6 +44,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -383,70 +384,86 @@ class RecordingService : Service() {
         isPaused = false
         timerJob?.cancel()
 
-        serviceScope.launch {
-            val totalSeconds = durationSeconds
-            val savedUri = currentOutputUri
-            val savedName = currentFileName
-
-            // If pure internal audio was recorded, merge video and audio tracks
-            if (isInternalAudio) {
-                internalAudioRecorder.stop()
-                try { mediaRecorder?.stop() } catch (e: Exception) {}
-                try {
-                    mediaRecorder?.reset()
-                    mediaRecorder?.release()
-                    mediaRecorder = null
-                } catch (e: Exception) {}
-
-                val vFile = tempVideoFile
-                val aFile = tempAudioFile
-                val pfd = fileDescriptor
-                if (vFile != null && aFile != null && pfd != null) {
-                    internalAudioRecorder.mergeVideoAndAudio(vFile, aFile, pfd.fileDescriptor)
-                }
-                try { vFile?.delete() } catch (e: Exception) {}
-                try { aFile?.delete() } catch (e: Exception) {}
-                tempVideoFile = null
-                tempAudioFile = null
-                isInternalAudio = false
-            }
-
-            cleanUp()
+        // 1. Instantly dismiss foreground notification and screen overlays on Main thread so SystemUI is lag-free!
+        try {
             stopForeground(STOP_FOREGROUND_REMOVE)
+            notificationManager.cancel(NOTIFICATION_RECORDING_ID)
+        } catch (e: Exception) {}
 
-            if (savedUri != null) {
-                // Finalize MediaStore entry (clear IS_PENDING)
-                mediaStoreRepository.finalizeVideoUri(savedUri)
+        try {
+            overlayManager.removeAllOverlays()
+        } catch (e: Exception) {}
 
-                // Calculate file size
-                val sizeStr = try {
-                    contentResolver.openFileDescriptor(savedUri, "r")?.use { pfd ->
-                        val bytes = pfd.statSize
-                        val mb = bytes / (1024f * 1024f)
-                        String.format(Locale.US, "%.1f MB", mb)
-                    } ?: "12.0 MB"
-                } catch (e: Exception) {
-                    "12.0 MB"
+        val totalSeconds = durationSeconds
+        val savedUri = currentOutputUri
+        val savedName = currentFileName
+        val wasInternal = isInternalAudio
+        val vFile = tempVideoFile
+        val aFile = tempAudioFile
+        val pfd = fileDescriptor
+
+        // 2. Perform all disk I/O, audio-video muxing and MediaStore finalization on Dispatchers.IO
+        serviceScope.launch(Dispatchers.IO) {
+            try {
+                if (wasInternal) {
+                    internalAudioRecorder.stop()
+                    try { mediaRecorder?.stop() } catch (e: Exception) {}
+                    try {
+                        mediaRecorder?.reset()
+                        mediaRecorder?.release()
+                        mediaRecorder = null
+                    } catch (e: Exception) {}
+
+                    if (vFile != null && aFile != null && pfd != null) {
+                        internalAudioRecorder.mergeVideoAndAudio(vFile, aFile, pfd.fileDescriptor)
+                    }
+                    try { vFile?.delete() } catch (e: Exception) {}
+                    try { aFile?.delete() } catch (e: Exception) {}
+                    tempVideoFile = null
+                    tempAudioFile = null
+                    isInternalAudio = false
                 }
 
-                val durationStr = String.format(Locale.US, "%02d:%02d", totalSeconds / 60, totalSeconds % 60)
+                cleanUpHardware()
 
-                // Post "Recording saved" Notification matching screenshot
-                postSavedNotification(savedUri, savedName, durationStr, sizeStr)
+                if (savedUri != null) {
+                    mediaStoreRepository.finalizeVideoUri(savedUri)
 
-                _serviceState.value = ServiceRecordingState(
-                    status = RecordingStatus.STOPPED,
-                    durationSeconds = totalSeconds,
-                    lastSavedUri = savedUri,
-                    lastSavedTitle = savedName,
-                    lastSavedSize = sizeStr,
-                    lastSavedDuration = durationStr
-                )
-            } else {
-                updateState(RecordingStatus.IDLE)
+                    val sizeStr = try {
+                        contentResolver.openFileDescriptor(savedUri, "r")?.use { fd ->
+                            val bytes = fd.statSize
+                            val mb = bytes / (1024f * 1024f)
+                            String.format(Locale.US, "%.1f MB", mb)
+                        } ?: "12.0 MB"
+                    } catch (e: Exception) {
+                        "12.0 MB"
+                    }
+
+                    val durationStr = String.format(Locale.US, "%02d:%02d", totalSeconds / 60, totalSeconds % 60)
+
+                    withContext(Dispatchers.Main) {
+                        postSavedNotification(savedUri, savedName, durationStr, sizeStr)
+                        _serviceState.value = ServiceRecordingState(
+                            status = RecordingStatus.STOPPED,
+                            durationSeconds = totalSeconds,
+                            lastSavedUri = savedUri,
+                            lastSavedTitle = savedName,
+                            lastSavedSize = sizeStr,
+                            lastSavedDuration = durationStr
+                        )
+                    }
+                } else {
+                    withContext(Dispatchers.Main) {
+                        updateState(RecordingStatus.IDLE)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error finalizing recording session", e)
+            } finally {
+                withContext(Dispatchers.Main) {
+                    stopSelf()
+                }
             }
-
-            stopSelf()
         }
     }
 
@@ -585,7 +602,10 @@ class RecordingService : Service() {
         } catch (e: Exception) {
             Log.e(TAG, "Error removing overlays", e)
         }
+        cleanUpHardware()
+    }
 
+    private fun cleanUpHardware() {
         try {
             virtualDisplay?.release()
             virtualDisplay = null
@@ -595,9 +615,7 @@ class RecordingService : Service() {
 
         try {
             mediaRecorder?.stop()
-        } catch (e: Exception) {
-            // Ignore if already stopped
-        }
+        } catch (e: Exception) {}
         try {
             mediaRecorder?.reset()
             mediaRecorder?.release()
