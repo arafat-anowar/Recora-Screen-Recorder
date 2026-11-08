@@ -62,17 +62,8 @@ class RecoraTileService : TileService() {
         tile.label = "Recora"
         tile.subtitle = if (isRecording) "Recording..." else "Tap to record"
         try {
-            val bmp = android.graphics.BitmapFactory.decodeResource(resources, R.drawable.ic_qs_recora_art)
-            if (bmp != null) {
-                tile.icon = Icon.createWithBitmap(bmp)
-            } else {
-                tile.icon = Icon.createWithResource(this, R.drawable.ic_qs_recora)
-            }
-        } catch (e: Exception) {
-            try {
-                tile.icon = Icon.createWithResource(this, R.drawable.ic_qs_recora)
-            } catch (ignored: Exception) {}
-        }
+            tile.icon = Icon.createWithResource(this, R.drawable.ic_qs_recora)
+        } catch (e: Exception) {}
         tile.updateTile()
     }
 }

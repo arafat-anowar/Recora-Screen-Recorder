@@ -97,18 +97,6 @@ fun RecordScreen(
 ) {
     val scrollState = rememberScrollState()
 
-    // Breathing pulse for record button
-    val infiniteTransition = rememberInfiniteTransition(label = "RecordPulse")
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = if (isRecording) 1.05f else 1.02f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "ButtonPulse"
-    )
-
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -248,82 +236,11 @@ fun RecordScreen(
             }
         }
 
-        // CENTER RECORD HERO AREA
-        Box(
-            modifier = Modifier
-                .size(230.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            // Faint outer ambient orbital ring
-            Box(
-                modifier = Modifier
-                    .size(220.dp)
-                    .clip(CircleShape)
-                    .border(1.dp, PrimaryPurple.copy(alpha = 0.15f), CircleShape)
-            )
-
-            // Even fainter larger orbital ring
-            Box(
-                modifier = Modifier
-                    .size(190.dp)
-                    .clip(CircleShape)
-                    .border(1.dp, PrimaryPurple.copy(alpha = 0.08f), CircleShape)
-            )
-
-            val recordInteractionSource = remember { MutableInteractionSource() }
-            val isRecordPressed by recordInteractionSource.collectIsPressedAsState()
-            val buttonPressScale by animateFloatAsState(
-                targetValue = if (isRecordPressed) 0.93f else pulseScale,
-                animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                label = "ButtonPressScale"
-            )
-
-            // Large Purple Outer Circle Button
-            Box(
-                modifier = Modifier
-                    .scale(buttonPressScale)
-                    .size(140.dp)
-                    .shadow(
-                        elevation = 30.dp,
-                        shape = CircleShape,
-                        spotColor = PrimaryPurple.copy(alpha = 0.5f),
-                        ambientColor = PrimaryPurple.copy(alpha = 0.3f)
-                    )
-                    .clip(CircleShape)
-                    .background(PrimaryPurple)
-                    .clickable(
-                        interactionSource = recordInteractionSource,
-                        indication = null
-                    ) { onStartRecordingClick() },
-                contentAlignment = Alignment.Center
-            ) {
-                // White concentric ring
-                Box(
-                    modifier = Modifier
-                        .size(68.dp)
-                        .clip(CircleShape)
-                        .border(5.dp, Color.White, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    // Inner pink record dot
-                    Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(CircleShape)
-                            .background(RecordPink),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        // Tiny center white/pink pip
-                        Box(
-                            modifier = Modifier
-                                .size(6.dp)
-                                .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.85f))
-                        )
-                    }
-                }
-            }
-        }
+        // CENTER RECORD HERO AREA (Zero Recomposition Isolation)
+        RecordHeroButton(
+            isRecording = isRecording,
+            onClick = onStartRecordingClick
+        )
 
         Spacer(modifier = Modifier.height(6.dp))
 
@@ -583,6 +500,102 @@ private fun QuickTogglePill(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+        }
+    }
+}
+
+@Composable
+private fun RecordHeroButton(
+    isRecording: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "HeroPulseTransition")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = if (isRecording) 1.05f else 1.02f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1400, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "HeroPulse"
+    )
+
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val pressScale by animateFloatAsState(
+        targetValue = if (isPressed) 0.93f else 1f,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "HeroPress"
+    )
+
+    Box(
+        modifier = modifier.size(230.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        // Subtle orbital rings
+        Box(
+            modifier = Modifier
+                .size(220.dp)
+                .clip(CircleShape)
+                .border(1.dp, PrimaryPurple.copy(alpha = 0.12f), CircleShape)
+        )
+
+        Box(
+            modifier = Modifier
+                .size(190.dp)
+                .clip(CircleShape)
+                .border(1.dp, PrimaryPurple.copy(alpha = 0.08f), CircleShape)
+        )
+
+        // Large Purple Outer Circle Button with isolated graphicsLayer transform (0 layout churn)
+        Box(
+            modifier = Modifier
+                .graphicsLayer {
+                    scaleX = pressScale * pulseScale
+                    scaleY = pressScale * pulseScale
+                }
+                .size(140.dp)
+                .shadow(
+                    elevation = 8.dp,
+                    shape = CircleShape,
+                    spotColor = PrimaryPurple.copy(alpha = 0.4f),
+                    ambientColor = PrimaryPurple.copy(alpha = 0.2f)
+                )
+                .clip(CircleShape)
+                .background(PrimaryPurple)
+                .border(2.dp, PrimaryPurple.copy(alpha = 0.5f), CircleShape)
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null
+                ) { onClick() },
+            contentAlignment = Alignment.Center
+        ) {
+            // White concentric ring
+            Box(
+                modifier = Modifier
+                    .size(68.dp)
+                    .clip(CircleShape)
+                    .border(5.dp, Color.White, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                // Inner pink record dot
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(RecordPink),
+                    contentAlignment = Alignment.Center
+                ) {
+                    // Tiny center white/pink pip
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.85f))
+                    )
+                }
+            }
         }
     }
 }

@@ -28,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -102,16 +103,19 @@ fun CountdownScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                // Countdown Circle with Purple Glow
+                // Countdown Circle with Purple Glow (Optimized graphicsLayer + subtle shadow)
                 Box(
                     modifier = Modifier
                         .size(240.dp)
-                        .scale(scaleAnim.value)
+                        .graphicsLayer {
+                            scaleX = scaleAnim.value
+                            scaleY = scaleAnim.value
+                        }
                         .shadow(
-                            elevation = 32.dp,
+                            elevation = 10.dp,
                             shape = CircleShape,
-                            spotColor = PrimaryPurple.copy(alpha = 0.7f),
-                            ambientColor = PrimaryPurple.copy(alpha = 0.5f)
+                            spotColor = PrimaryPurple.copy(alpha = 0.5f),
+                            ambientColor = PrimaryPurple.copy(alpha = 0.3f)
                         )
                         .clip(CircleShape)
                         .background(Color.Transparent)

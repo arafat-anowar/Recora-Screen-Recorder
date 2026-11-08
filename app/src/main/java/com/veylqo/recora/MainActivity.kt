@@ -96,19 +96,40 @@ import java.util.Locale
 
 class MainActivity : ComponentActivity() {
 
+    private val triggerRecordFromTile = androidx.compose.runtime.mutableStateOf(false)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        handleIntent(intent)
         setContent {
             RecoraTheme {
-                RecoraApp()
+                RecoraApp(
+                    triggerRecordFromTile = triggerRecordFromTile.value,
+                    onTileTriggerConsumed = { triggerRecordFromTile.value = false }
+                )
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        if (intent?.getBooleanExtra("action_from_tile", false) == true) {
+            triggerRecordFromTile.value = true
         }
     }
 }
 
 @Composable
-fun RecoraApp() {
+fun RecoraApp(
+    triggerRecordFromTile: Boolean = false,
+    onTileTriggerConsumed: () -> Unit = {}
+) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val mediaStoreRepo = remember { MediaStoreRepository(context) }
@@ -386,6 +407,13 @@ fun RecoraApp() {
         } else {
             val projManager = context.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
             projectionLauncher.launch(projManager.createScreenCaptureIntent())
+        }
+    }
+
+    LaunchedEffect(triggerRecordFromTile) {
+        if (triggerRecordFromTile && !isRecording) {
+            onTileTriggerConsumed()
+            requestRecordingStart()
         }
     }
 

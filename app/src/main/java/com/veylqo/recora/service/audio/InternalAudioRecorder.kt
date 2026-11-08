@@ -134,7 +134,7 @@ class InternalAudioRecorder {
             recordThread = Thread({
                 processAudioCapture(bufferSize)
             }, "RecoraInternalAudioCapture").apply {
-                priority = Thread.MAX_PRIORITY
+                priority = Thread.NORM_PRIORITY + 2
                 start()
             }
 
@@ -149,6 +149,10 @@ class InternalAudioRecorder {
     }
 
     private fun processAudioCapture(bufferSize: Int) {
+        try {
+            android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_AUDIO)
+        } catch (e: Exception) {}
+
         val pcmBuffer = ByteArray(bufferSize)
         val micBuffer = if (micAudioRecord != null) ByteArray(bufferSize) else null
         val bufferInfo = MediaCodec.BufferInfo()
@@ -162,7 +166,10 @@ class InternalAudioRecorder {
 
         while (isRecording.get()) {
             val bytesRead = record.read(pcmBuffer, 0, pcmBuffer.size)
-            if (bytesRead <= 0) continue
+            if (bytesRead <= 0) {
+                try { Thread.sleep(5) } catch (e: Exception) {}
+                continue
+            }
 
             // If mixing microphone audio with internal audio:
             if (mic != null && micBuffer != null) {
@@ -172,11 +179,16 @@ class InternalAudioRecorder {
                 }
             }
 
-            // Feed PCM into MediaCodec encoder
+            // Feed PCM into MediaCodec encoder with bounded retry and sleep backoff
             var inputBufferIndex = codec.dequeueInputBuffer(TIMEOUT_US)
-            while (inputBufferIndex < 0 && isRecording.get()) {
+            var attempts = 0
+            while (inputBufferIndex < 0 && isRecording.get() && attempts < 5) {
                 drainEncoder(codec, mux, bufferInfo, false)
                 inputBufferIndex = codec.dequeueInputBuffer(TIMEOUT_US)
+                attempts++
+                if (inputBufferIndex < 0) {
+                    try { Thread.sleep(2) } catch (e: Exception) {}
+                }
             }
 
             if (inputBufferIndex >= 0) {

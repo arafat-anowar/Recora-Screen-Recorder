@@ -1,18 +1,12 @@
 package com.veylqo.recora.ui.components
 
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -24,8 +18,7 @@ private data class Star(
     val xFraction: Float,
     val yFraction: Float,
     val radius: Float,
-    val baseAlpha: Float,
-    val twinklingGroup: Int
+    val alpha: Float
 )
 
 @Composable
@@ -55,144 +48,52 @@ fun GalaxyBackground(
                     xFraction = x,
                     yFraction = y,
                     radius = r,
-                    baseAlpha = 0.25f + ((index % 5) * 0.12f),
-                    twinklingGroup = index % 3
+                    alpha = 0.35f + ((index % 4) * 0.12f)
                 )
             )
         }
         list
     }
 
-    val nebulaPulse1: Float
-    val nebulaPulse2: Float
-    val twinkleAlpha1: Float
-    val twinkleAlpha2: Float
-
-    if (reduceMotion) {
-        // High performance mode: zero GPU animation redraw overhead!
-        nebulaPulse1 = 0.08f
-        nebulaPulse2 = 0.06f
-        twinkleAlpha1 = 0.4f
-        twinkleAlpha2 = 0.6f
-    } else {
-        val infiniteTransition = rememberInfiniteTransition(label = "GalaxyMotion")
-        val p1 by infiniteTransition.animateFloat(
-            initialValue = 0.06f,
-            targetValue = 0.12f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 8000, easing = FastOutSlowInEasing),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "Nebula1"
+    val bgGradient = remember {
+        Brush.verticalGradient(
+            colors = listOf(BgDarkNavyTop, BgDarkNavyCenter, BgDarkNavyBottom)
         )
-        val p2 by infiniteTransition.animateFloat(
-            initialValue = 0.05f,
-            targetValue = 0.10f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 11000, easing = FastOutSlowInEasing),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "Nebula2"
-        )
-        val t1 by infiniteTransition.animateFloat(
-            initialValue = 0.3f,
-            targetValue = 0.85f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 4000, easing = FastOutSlowInEasing),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "Twinkle1"
-        )
-        val t2 by infiniteTransition.animateFloat(
-            initialValue = 0.8f,
-            targetValue = 0.25f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 5500, easing = FastOutSlowInEasing),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "Twinkle2"
-        )
-        nebulaPulse1 = p1
-        nebulaPulse2 = p2
-        twinkleAlpha1 = t1
-        twinkleAlpha2 = t2
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val width = size.width
-            val height = size.height
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(bgGradient)
+            .drawBehind {
+                val width = size.width
+                val height = size.height
 
-            // 1. Base Dark Navy Gradient
-            drawRect(
-                brush = Brush.verticalGradient(
-                    colors = listOf(BgDarkNavyTop, BgDarkNavyCenter, BgDarkNavyBottom),
-                    startY = 0f,
-                    endY = height
-                )
-            )
-
-            // 2. Subtle Nebula Glow 1 (Upper Left Purple)
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        Color(0xFF7F5AF0).copy(alpha = nebulaPulse1),
-                        Color(0xFF7F5AF0).copy(alpha = nebulaPulse1 * 0.4f),
-                        Color.Transparent
-                    ),
-                    center = Offset(width * 0.25f, height * 0.22f),
-                    radius = width * 0.75f
-                ),
-                radius = width * 0.75f,
-                center = Offset(width * 0.25f, height * 0.22f)
-            )
-
-            // 3. Subtle Nebula Glow 2 (Lower Right Indigo)
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        Color(0xFF382372).copy(alpha = nebulaPulse2),
-                        Color(0xFF201344).copy(alpha = nebulaPulse2 * 0.3f),
-                        Color.Transparent
-                    ),
-                    center = Offset(width * 0.85f, height * 0.70f),
-                    radius = width * 0.8f
-                ),
-                radius = width * 0.8f,
-                center = Offset(width * 0.85f, height * 0.70f)
-            )
-
-            // 4. Very faint Pink warmth near bottom
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        Color(0xFFF0446A).copy(alpha = 0.035f),
-                        Color.Transparent
-                    ),
-                    center = Offset(width * 0.5f, height * 0.95f),
-                    radius = width * 0.5f
-                ),
-                radius = width * 0.5f,
-                center = Offset(width * 0.5f, height * 0.95f)
-            )
-
-            // 5. Dim subtle stars
-            stars.forEach { star ->
-                val alpha = when (star.twinklingGroup) {
-                    0 -> star.baseAlpha
-                    1 -> if (reduceMotion) star.baseAlpha else twinkleAlpha1 * star.baseAlpha
-                    else -> if (reduceMotion) star.baseAlpha else twinkleAlpha2 * star.baseAlpha
-                }.coerceIn(0.1f, 0.9f)
-
+                // 1. Subtle static ambient nebula glow behind hero area (Zero per-frame shader rebuilds)
                 drawCircle(
-                    color = Color.White.copy(alpha = alpha),
-                    radius = star.radius,
-                    center = Offset(star.xFraction * width, star.yFraction * height)
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            Color(0xFF7F5AF0).copy(alpha = 0.09f),
+                            Color(0xFF382372).copy(alpha = 0.04f),
+                            Color.Transparent
+                        ),
+                        center = Offset(width * 0.5f, height * 0.30f),
+                        radius = width * 0.85f
+                    ),
+                    radius = width * 0.85f,
+                    center = Offset(width * 0.5f, height * 0.30f)
                 )
-            }
-        }
 
-        // Screen content on top of background
+                // 2. Crisp subtle stars (drawn cleanly without frame loops)
+                for (star in stars) {
+                    drawCircle(
+                        color = Color.White.copy(alpha = star.alpha),
+                        radius = star.radius,
+                        center = Offset(star.xFraction * width, star.yFraction * height)
+                    )
+                }
+            }
+    ) {
         content()
     }
 }

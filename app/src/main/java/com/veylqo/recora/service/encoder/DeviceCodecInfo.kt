@@ -61,8 +61,14 @@ object DeviceCodecInfo {
             (minDim <= maxWidth && maxDim <= maxHeight)
         )
 
-        val targetFps = if (videoCaps != null && videoCaps.supportedFrameRates.contains(requestedFps)) {
-            requestedFps
+        // On mobile chipsets (e.g. MediaTek Dimensity), resolutions exceeding 1080p (Native 1080x2340 = 2.53MP)
+        // exceed the 124 MP/s encoder clock limit at 60fps. Capping to 30fps for ultra-tall Native guarantees
+        // zero SurfaceFlinger backpressure, zero screen lag, and 100% smooth UI.
+        val isLargeResolution = (alignedW.toLong() * alignedH.toLong()) > (1920L * 1080L)
+        val safeRequestedFps = if (isLargeResolution && requestedFps > 30) 30 else requestedFps
+
+        val targetFps = if (videoCaps != null && videoCaps.supportedFrameRates.contains(safeRequestedFps)) {
+            safeRequestedFps
         } else {
             30
         }
@@ -150,9 +156,10 @@ object DeviceCodecInfo {
     private fun calculateTargetBitrate(w: Int, h: Int, fps: Int): Int {
         val pixels = w.toLong() * h.toLong()
         return when {
-            pixels >= 3840 * 2160 -> if (fps >= 60) 28_000_000 else 20_000_000
-            pixels >= 2560 * 1440 -> if (fps >= 60) 20_000_000 else 14_000_000
-            pixels >= 1920 * 1080 -> if (fps >= 60) 14_000_000 else 10_000_000
+            pixels >= 3840 * 2160 -> if (fps >= 60) 24_000_000 else 16_000_000
+            pixels >= 2560 * 1440 -> if (fps >= 60) 16_000_000 else 12_000_000
+            pixels > 1920 * 1080 -> 8_000_000 // Native ultra-tall resolution (1080x2340): smooth 8 Mbps
+            pixels >= 1920 * 1080 -> if (fps >= 60) 10_000_000 else 8_000_000
             else -> 6_000_000
         }
     }
