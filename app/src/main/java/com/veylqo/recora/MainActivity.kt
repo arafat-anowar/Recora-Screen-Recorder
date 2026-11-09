@@ -289,8 +289,11 @@ fun RecoraApp(
     ) { granted ->
         if (granted) {
             uiState = uiState.copy(facecam = true)
+            previewOverlayManager.showFacecamOverlay()
             showToast("Facecam: ON")
         } else {
+            uiState = uiState.copy(facecam = false)
+            previewOverlayManager.hideFacecamOverlay()
             showToast("Camera permission required for Facecam")
         }
     }
@@ -399,6 +402,11 @@ fun RecoraApp(
         if (uiState.audioSource != AudioSource.None) {
             if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
                 neededPermissions.add(Manifest.permission.RECORD_AUDIO)
+            }
+        }
+        if (uiState.facecam) {
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                neededPermissions.add(Manifest.permission.CAMERA)
             }
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -522,10 +530,12 @@ fun RecoraApp(
                                             cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
                                         } else {
                                             uiState = uiState.copy(facecam = true)
+                                            previewOverlayManager.showFacecamOverlay()
                                             showToast("Facecam: ON")
                                         }
                                     } else {
                                         uiState = uiState.copy(facecam = false)
+                                        previewOverlayManager.hideFacecamOverlay()
                                         showToast("Facecam: OFF")
                                     }
                                 },

@@ -195,7 +195,14 @@ class RecordingService : Service() {
                 durationSeconds = 0
                 recordingStartTimeMs = System.currentTimeMillis()
                 val initialNotification = buildRecordingNotification(isPaused = false)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    ServiceCompat.startForeground(
+                        this@RecordingService,
+                        NOTIFICATION_RECORDING_ID,
+                        initialNotification,
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION or ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+                    )
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     ServiceCompat.startForeground(
                         this@RecordingService,
                         NOTIFICATION_RECORDING_ID,

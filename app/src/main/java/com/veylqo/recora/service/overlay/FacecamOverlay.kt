@@ -69,7 +69,9 @@ class FacecamOverlay(
                 @Suppress("DEPRECATION")
                 WindowManager.LayoutParams.TYPE_PHONE
             },
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
@@ -140,15 +142,20 @@ class FacecamOverlay(
             clipToOutline = true
             outlineProvider = object : ViewOutlineProvider() {
                 override fun getOutline(view: View, outline: Outline) {
-                    outline.setOval(0, 0, view.width, view.height)
+                    val w = if (view.width > 0) view.width else sizePx
+                    val h = if (view.height > 0) view.height else sizePx
+                    outline.setOval(0, 0, w, h)
                 }
+            }
+            addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+                invalidateOutline()
             }
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
                 setColor(Color.BLACK)
                 setStroke((3 * density).toInt(), Color.parseColor("#7F5AF0"))
             }
-            elevation = 28f
+            elevation = 0f
         }
 
         // Camera PreviewView inside the circle
@@ -252,6 +259,11 @@ class FacecamOverlay(
     }
 
     private fun bindCameraPreview(previewView: PreviewView) {
+        if (androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.CAMERA) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            Log.e(TAG, "Cannot bind camera: CAMERA permission not granted")
+            return
+        }
+
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
         cameraProviderFuture.addListener({
             try {
