@@ -83,28 +83,28 @@ fun CountdownScreen(
             .padding(horizontal = 24.dp)
             .padding(top = 48.dp, bottom = 48.dp)
     ) {
-        // Center: Circular Countdown Chronometer with ONLY the countdown number inside
+        // Center: Circular Countdown Chronometer with ONLY the countdown number inside (Compact 68dp badge)
         Box(
             modifier = Modifier
-                .size(140.dp)
+                .size(68.dp)
                 .align(Alignment.Center)
                 .drawBehind {
                     val center = Offset(size.width / 2f, size.height / 2f)
-                    val strokeWidth = 5.dp.toPx()
-                    val radius = (size.minDimension - strokeWidth) / 2f - 4.dp.toPx()
+                    val strokeWidth = 3.5.dp.toPx()
+                    val radius = (size.minDimension - strokeWidth) / 2f - 3.dp.toPx()
 
                     // 1. Outer Soft Neon Glow (Multi-layer diffuse aura)
                     drawCircle(
                         color = themePurple.copy(alpha = 0.12f),
                         radius = radius,
                         center = center,
-                        style = Stroke(width = strokeWidth + 12.dp.toPx())
+                        style = Stroke(width = strokeWidth + 8.dp.toPx())
                     )
                     drawCircle(
                         color = themePurple.copy(alpha = 0.28f),
                         radius = radius,
                         center = center,
-                        style = Stroke(width = strokeWidth + 4.dp.toPx())
+                        style = Stroke(width = strokeWidth + 3.dp.toPx())
                     )
 
                     // 2. Full Background Dimmed Track
@@ -129,7 +129,7 @@ fun CountdownScreen(
                 },
             contentAlignment = Alignment.Center
         ) {
-            // Big Countdown Number with smooth rolling transition (ONLY the countdown number)
+            // Big Countdown Number with smooth rolling transition
             AnimatedContent(
                 targetState = displaySeconds,
                 transitionSpec = {
@@ -142,7 +142,7 @@ fun CountdownScreen(
             ) { sec ->
                 Text(
                     text = "$sec",
-                    fontSize = 58.sp,
+                    fontSize = 28.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )

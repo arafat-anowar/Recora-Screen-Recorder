@@ -72,19 +72,24 @@ class FloatingCountdownOverlay(private val context: Context) {
 
         private val numberTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
-            textSize = 28 * density
+            textSize = 26 * density
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             textAlign = Paint.Align.CENTER
         }
 
         private val arcRect = RectF()
 
+        override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+            val size = (68 * density).toInt()
+            setMeasuredDimension(size, size)
+        }
+
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
             val cx = width / 2f
             val cy = height / 2f
             val strokeWidth = 3.5f * density
-            val radius = cx - (strokeWidth / 2f) - (4 * density)
+            val radius = cx.coerceAtMost(cy) - (strokeWidth / 2f) - (3 * density)
 
             // 1. Translucent Dark Glass Circle
             canvas.drawCircle(cx, cy, radius, bgPaint)
@@ -118,10 +123,12 @@ class FloatingCountdownOverlay(private val context: Context) {
         val density = context.resources.displayMetrics.density
         val totalSec = if (initialSeconds <= 0) 3 else initialSeconds
 
-        // Center floating minimalist countdown on user's mobile home screen (Transparent overlay)
+        val dialSize = (68 * density).toInt()
+
+        // Center floating minimalist countdown on user's mobile home screen (Strict 68dp compact badge)
         val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
+            dialSize,
+            dialSize,
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             } else {
@@ -132,13 +139,11 @@ class FloatingCountdownOverlay(private val context: Context) {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.CENTER
+            width = dialSize
+            height = dialSize
         }
 
-        // Ultra-compact 70dp Dial View directly added as the overlay view
-        val dialSize = (70 * density).toInt()
-        val dialView = CountdownDialView(context).apply {
-            layoutParams = WindowManager.LayoutParams(dialSize, dialSize)
-        }
+        val dialView = CountdownDialView(context)
 
         rootLayout = dialView
 
