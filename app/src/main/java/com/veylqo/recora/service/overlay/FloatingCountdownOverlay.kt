@@ -53,26 +53,26 @@ class FloatingCountdownOverlay(private val context: Context) {
 
         private val outerGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
-            strokeWidth = 14 * density
+            strokeWidth = 8f * density
             color = Color.parseColor("#388B5CF6") // Soft purple neon glow
         }
 
         private val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
-            strokeWidth = 5.5f * density
+            strokeWidth = 3.5f * density
             color = Color.parseColor("#308B5CF6") // Dimmed purple track
         }
 
         private val activeArcPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
-            strokeWidth = 5.5f * density
+            strokeWidth = 3.5f * density
             strokeCap = Paint.Cap.BUTT
             color = Color.parseColor("#8B5CF6") // Recora signature primary purple
         }
 
         private val numberTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
-            textSize = 48 * density
+            textSize = 28 * density
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             textAlign = Paint.Align.CENTER
         }
@@ -83,8 +83,8 @@ class FloatingCountdownOverlay(private val context: Context) {
             super.onDraw(canvas)
             val cx = width / 2f
             val cy = height / 2f
-            val strokeWidth = 5.5f * density
-            val radius = cx - (strokeWidth / 2f) - (6 * density)
+            val strokeWidth = 3.5f * density
+            val radius = cx - (strokeWidth / 2f) - (4 * density)
 
             // 1. Translucent Dark Glass Circle
             canvas.drawCircle(cx, cy, radius, bgPaint)
@@ -134,8 +134,8 @@ class FloatingCountdownOverlay(private val context: Context) {
             gravity = Gravity.CENTER
         }
 
-        // Compact Dial View (110dp) directly added as the overlay view (No cancel button)
-        val dialSize = (110 * density).toInt()
+        // Ultra-compact 70dp Dial View directly added as the overlay view
+        val dialSize = (70 * density).toInt()
         val dialView = CountdownDialView(context).apply {
             layoutParams = WindowManager.LayoutParams(dialSize, dialSize)
         }

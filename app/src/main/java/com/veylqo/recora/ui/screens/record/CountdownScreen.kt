@@ -86,25 +86,25 @@ fun CountdownScreen(
         // Center: Circular Countdown Chronometer with ONLY the countdown number inside
         Box(
             modifier = Modifier
-                .size(220.dp)
+                .size(140.dp)
                 .align(Alignment.Center)
                 .drawBehind {
                     val center = Offset(size.width / 2f, size.height / 2f)
-                    val strokeWidth = 9.dp.toPx()
-                    val radius = (size.minDimension - strokeWidth) / 2f - 8.dp.toPx()
+                    val strokeWidth = 5.dp.toPx()
+                    val radius = (size.minDimension - strokeWidth) / 2f - 4.dp.toPx()
 
                     // 1. Outer Soft Neon Glow (Multi-layer diffuse aura)
                     drawCircle(
                         color = themePurple.copy(alpha = 0.12f),
                         radius = radius,
                         center = center,
-                        style = Stroke(width = strokeWidth + 20.dp.toPx())
+                        style = Stroke(width = strokeWidth + 12.dp.toPx())
                     )
                     drawCircle(
                         color = themePurple.copy(alpha = 0.28f),
                         radius = radius,
                         center = center,
-                        style = Stroke(width = strokeWidth + 8.dp.toPx())
+                        style = Stroke(width = strokeWidth + 4.dp.toPx())
                     )
 
                     // 2. Full Background Dimmed Track
@@ -142,7 +142,7 @@ fun CountdownScreen(
             ) { sec ->
                 Text(
                     text = "$sec",
-                    fontSize = 100.sp,
+                    fontSize = 58.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )
