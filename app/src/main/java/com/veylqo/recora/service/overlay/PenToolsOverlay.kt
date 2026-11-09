@@ -163,14 +163,14 @@ class PenToolsOverlay(
     private fun createToolbarView(density: Float, tParams: WindowManager.LayoutParams, root: View): LinearLayout {
         val container = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
-            setPadding((10 * density).toInt(), (6 * density).toInt(), (10 * density).toInt(), (6 * density).toInt())
+            setPadding((6 * density).toInt(), (4 * density).toInt(), (6 * density).toInt(), (4 * density).toInt())
             background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
-                cornerRadius = 32 * density
-                setColor(Color.parseColor("#F2141029"))
-                setStroke((1.5f * density).toInt(), Color.parseColor("#7F5AF0"))
+                cornerRadius = 22 * density
+                setColor(Color.parseColor("#F4141029"))
+                setStroke((1.2f * density).toInt(), Color.parseColor("#7F5AF0"))
             }
-            elevation = 32f
+            elevation = 28f
             gravity = Gravity.CENTER_VERTICAL
         }
 
@@ -178,8 +178,9 @@ class PenToolsOverlay(
         val dragHandle = TextView(context).apply {
             text = "⠿"
             setTextColor(Color.parseColor("#B8A7FF"))
-            textSize = 18f
-            setPadding((4 * density).toInt(), 0, (6 * density).toInt(), 0)
+            textSize = 14f
+            setPadding((3 * density).toInt(), 0, (3 * density).toInt(), 0)
+            gravity = Gravity.CENTER
         }
         container.addView(dragHandle)
         attachDragListener(dragHandle, tParams, root)
@@ -195,14 +196,12 @@ class PenToolsOverlay(
         }
         container.addView(modeBtn)
 
-        // Color Dots (Purple, Pink, Gold, Cyan, White)
+        // Core 3 Compact Colors: Signature Purple, Vibrant Pink, Pure White
         val purpleDot = createColorDot(Color.parseColor("#7F5AF0"), density)
         val pinkDot = createColorDot(Color.parseColor("#F0446A"), density)
-        val goldDot = createColorDot(Color.parseColor("#FFD21F"), density)
-        val cyanDot = createColorDot(Color.parseColor("#00E5FF"), density)
         val whiteDot = createColorDot(Color.WHITE, density)
 
-        val dots = listOf(purpleDot, pinkDot, goldDot, cyanDot, whiteDot)
+        val dots = listOf(purpleDot, pinkDot, whiteDot)
 
         fun selectColor(targetDot: View, color: Int) {
             currentColor = color
@@ -212,35 +211,19 @@ class PenToolsOverlay(
             modeBtn.alpha = 1.0f
             dots.forEach { d ->
                 (d.background as GradientDrawable).setStroke(
-                    if (d == targetDot) (3 * density).toInt() else 0,
-                    Color.WHITE
+                    if (d == targetDot) (2.5f * density).toInt() else 0,
+                    if (d == whiteDot && d == targetDot) Color.parseColor("#7F5AF0") else Color.WHITE
                 )
             }
         }
 
         purpleDot.setOnClickListener { selectColor(it, Color.parseColor("#7F5AF0")) }
         pinkDot.setOnClickListener { selectColor(it, Color.parseColor("#F0446A")) }
-        goldDot.setOnClickListener { selectColor(it, Color.parseColor("#FFD21F")) }
-        cyanDot.setOnClickListener { selectColor(it, Color.parseColor("#00E5FF")) }
         whiteDot.setOnClickListener { selectColor(it, Color.WHITE) }
 
         selectColor(purpleDot, Color.parseColor("#7F5AF0"))
 
         dots.forEach { container.addView(it) }
-
-        // Stroke Thickness Toggle Button
-        val strokeBtn = createIconButton(R.drawable.ic_control_pen, active = false, density) { view ->
-            strokeIndex = (strokeIndex + 1) % STROKE_WIDTHS.size
-            currentStrokeWidth = STROKE_WIDTHS[strokeIndex]
-            val scale = when (strokeIndex) {
-                0 -> 0.75f
-                1 -> 1.0f
-                else -> 1.35f
-            }
-            view.scaleX = scale
-            view.scaleY = scale
-        }
-        container.addView(strokeBtn)
 
         // Eraser Button
         val eraserBtn = createIconButton(R.drawable.ic_control_eraser, active = false, density) { view ->
@@ -269,11 +252,11 @@ class PenToolsOverlay(
         // Minimize Button (›)
         val minBtn = TextView(context).apply {
             text = "›"
-            textSize = 20f
+            textSize = 18f
             setTextColor(Color.parseColor("#B8A7FF"))
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
-            setPadding((6 * density).toInt(), 0, (6 * density).toInt(), 0)
+            setPadding((4 * density).toInt(), 0, (4 * density).toInt(), 0)
             isClickable = true
             setOnClickListener { toggleExpandCollapse() }
         }
@@ -290,22 +273,22 @@ class PenToolsOverlay(
 
     @SuppressLint("ClickableViewAccessibility")
     private fun createCollapsedBubble(density: Float, tParams: WindowManager.LayoutParams, root: View): View {
-        val bubbleSize = (44 * density).toInt()
+        val bubbleSize = (38 * density).toInt()
 
         val bubble = FrameLayout(context).apply {
             layoutParams = FrameLayout.LayoutParams(bubbleSize, bubbleSize)
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
                 setColor(Color.parseColor("#F2141029"))
-                setStroke((2 * density).toInt(), Color.parseColor("#7F5AF0"))
+                setStroke((1.5f * density).toInt(), Color.parseColor("#7F5AF0"))
             }
-            elevation = 32f
+            elevation = 28f
         }
 
         val penIcon = ImageView(context).apply {
             setImageResource(R.drawable.ic_control_pen)
             setColorFilter(Color.parseColor("#B8A7FF"))
-            val pad = (11 * density).toInt()
+            val pad = (9.5f * density).toInt()
             setPadding(pad, pad, pad, pad)
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
@@ -384,10 +367,11 @@ class PenToolsOverlay(
     }
 
     private fun createColorDot(color: Int, density: Float): View {
-        val size = (22 * density).toInt()
+        val size = (16 * density).toInt()
         return View(context).apply {
             layoutParams = LinearLayout.LayoutParams(size, size).apply {
-                setMargins((3 * density).toInt(), 0, (3 * density).toInt(), 0)
+                val m = (2 * density).toInt()
+                setMargins(m, 0, m, 0)
             }
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
@@ -398,13 +382,14 @@ class PenToolsOverlay(
     }
 
     private fun createIconButton(iconRes: Int, active: Boolean, density: Float, onClick: (View) -> Unit): ImageView {
-        val size = (32 * density).toInt()
-        val pad = (6 * density).toInt()
+        val size = (28 * density).toInt()
+        val pad = (5.5f * density).toInt()
         return ImageView(context).apply {
             setImageResource(iconRes)
             setPadding(pad, pad, pad, pad)
             layoutParams = LinearLayout.LayoutParams(size, size).apply {
-                setMargins((2 * density).toInt(), 0, (2 * density).toInt(), 0)
+                val m = (1.5f * density).toInt()
+                setMargins(m, 0, m, 0)
             }
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL

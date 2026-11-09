@@ -121,7 +121,8 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleIntent(intent: Intent?) {
-        if (intent?.getBooleanExtra("action_from_tile", false) == true) {
+        if (intent?.getBooleanExtra("action_from_tile", false) == true ||
+            intent?.getBooleanExtra("action_from_overlay", false) == true) {
             triggerRecordFromTile.value = true
         }
     }
@@ -139,6 +140,7 @@ fun RecoraApp(
 
     var currentTab by remember { mutableStateOf(NavTab.Record) }
     var uiState by remember { mutableStateOf(RecordUiState()) }
+    var startRecordingTrigger by remember { mutableStateOf(false) }
 
     // Service Recording State
     val serviceState by RecordingService.serviceState.collectAsState()
@@ -206,6 +208,14 @@ fun RecoraApp(
     val previewOverlayManager = remember {
         com.veylqo.recora.service.overlay.OverlayManager(
             context = context.applicationContext,
+            onStartRecording = {
+                val intent = Intent(context, MainActivity::class.java).apply {
+                    putExtra("action_from_overlay", true)
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                }
+                context.startActivity(intent)
+                startRecordingTrigger = true
+            },
             onStopRecording = {
                 if (isRecording) {
                     val intent = Intent(context, RecordingService::class.java).apply {
@@ -229,13 +239,28 @@ fun RecoraApp(
             onMicMute = { isMuted ->
                 showToast(if (isMuted) "Microphone muted" else "Microphone unmuted")
             },
+            onControlsClosed = {
+                uiState = uiState.copy(floatingControls = false)
+            },
             onPenClosed = {
                 uiState = uiState.copy(penAndTools = false)
             },
             onFacecamClosed = {
                 uiState = uiState.copy(facecam = false)
-            }
+            },
+            initialIsRecording = isRecording,
+            initialIsPaused = isPaused
         )
+    }
+
+    LaunchedEffect(isRecording, isPaused) {
+        previewOverlayManager.updateRecordingState(isRecording, isPaused)
+    }
+
+    LaunchedEffect(isRecording) {
+        if (!isRecording && uiState.floatingControls) {
+            previewOverlayManager.showControlsOverlay()
+        }
     }
 
     // Floating Countdown Overlay that displays over the mobile home screen!
@@ -430,6 +455,13 @@ fun RecoraApp(
         }
     }
 
+    LaunchedEffect(startRecordingTrigger) {
+        if (startRecordingTrigger && !isRecording) {
+            startRecordingTrigger = false
+            requestRecordingStart()
+        }
+    }
+
     val durationFormatted = remember(serviceState.durationSeconds) {
         val min = serviceState.durationSeconds / 60
         val sec = serviceState.durationSeconds % 60
@@ -502,10 +534,12 @@ fun RecoraApp(
                                             showOverlayPermissionDialog = true
                                         } else {
                                             uiState = uiState.copy(floatingControls = true)
+                                            previewOverlayManager.showControlsOverlay()
                                             showToast("Floating Controls: ON")
                                         }
                                     } else {
                                         uiState = uiState.copy(floatingControls = false)
+                                        previewOverlayManager.hideControlsOverlay()
                                         showToast("Floating Controls: OFF")
                                     }
                                 },
@@ -515,10 +549,12 @@ fun RecoraApp(
                                             showOverlayPermissionDialog = true
                                         } else {
                                             uiState = uiState.copy(penAndTools = true)
+                                            previewOverlayManager.showPenOverlay()
                                             showToast("Pen & Tools: ON")
                                         }
                                     } else {
                                         uiState = uiState.copy(penAndTools = false)
+                                        previewOverlayManager.hidePenOverlay()
                                         showToast("Pen & Tools: OFF")
                                     }
                                 },

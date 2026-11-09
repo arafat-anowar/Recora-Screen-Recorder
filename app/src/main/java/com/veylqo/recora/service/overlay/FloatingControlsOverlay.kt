@@ -20,23 +20,60 @@ import kotlin.math.abs
 
 class FloatingControlsOverlay(
     private val context: Context,
+    private val onRecordClick: () -> Unit,
     private val onStopClick: () -> Unit,
     private val onPauseResumeClick: (isPaused: Boolean) -> Unit,
     private val onPenToggleClick: () -> Unit,
     private val onScreenshotClick: () -> Unit,
     private val onMicMuteClick: (isMuted: Boolean) -> Unit,
-    private val onFacecamToggleClick: (() -> Unit)? = null
+    private val onFacecamToggleClick: (() -> Unit)? = null,
+    private val onCloseClick: (() -> Unit)? = null,
+    private var isRecording: Boolean = false,
+    private var isPaused: Boolean = false
 ) {
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     private var rootLayout: View? = null
     private var windowParams: WindowManager.LayoutParams? = null
 
     private var isExpanded = true
-    private var isPaused = false
     private var isMuted = false
 
     private var expandedBar: LinearLayout? = null
     private var collapsedBubble: View? = null
+
+    private var recordBtn: View? = null
+    private var pauseBtn: View? = null
+    private var stopBtn: View? = null
+    private var micBtn: View? = null
+    private var closeBtn: View? = null
+    private var recordingDot: View? = null
+
+    fun updateState(recording: Boolean, paused: Boolean) {
+        isRecording = recording
+        isPaused = paused
+        refreshButtons()
+    }
+
+    private fun refreshButtons() {
+        if (!isRecording) {
+            recordBtn?.visibility = View.VISIBLE
+            pauseBtn?.visibility = View.GONE
+            stopBtn?.visibility = View.GONE
+            micBtn?.visibility = View.GONE
+            closeBtn?.visibility = View.VISIBLE
+            recordingDot?.visibility = View.GONE
+        } else {
+            recordBtn?.visibility = View.GONE
+            pauseBtn?.visibility = View.VISIBLE
+            stopBtn?.visibility = View.VISIBLE
+            micBtn?.visibility = View.VISIBLE
+            closeBtn?.visibility = View.GONE
+            recordingDot?.visibility = View.VISIBLE
+            (pauseBtn as? ImageView)?.setImageResource(
+                if (isPaused) R.drawable.ic_control_play else R.drawable.ic_control_pause
+            )
+        }
+    }
 
     @SuppressLint("ClickableViewAccessibility")
     fun show() {
@@ -74,6 +111,8 @@ class FloatingControlsOverlay(
         collapsedBubble = bubble
         bubble.visibility = View.GONE
         root.addView(bubble)
+
+        refreshButtons()
 
         rootLayout = root
         try {
@@ -126,7 +165,7 @@ class FloatingControlsOverlay(
     private fun buildExpandedBar(density: Float, params: WindowManager.LayoutParams, root: View): LinearLayout {
         val bar = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
-            setPadding((10 * density).toInt(), (6 * density).toInt(), (10 * density).toInt(), (6 * density).toInt())
+            setPadding((8 * density).toInt(), (5 * density).toInt(), (8 * density).toInt(), (5 * density).toInt())
             background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
                 cornerRadius = 60 * density
@@ -142,27 +181,40 @@ class FloatingControlsOverlay(
             text = "⠿"
             setTextColor(Color.parseColor("#B8A7FF"))
             textSize = 18f
-            setPadding((6 * density).toInt(), 0, (8 * density).toInt(), 0)
+            setPadding((5 * density).toInt(), 0, (6 * density).toInt(), 0)
             gravity = Gravity.CENTER
         }
         bar.addView(dragHandle)
         attachDragListener(dragHandle, params, root)
 
-        // Pause / Resume Button
-        val pauseBtn = createActionButton(R.drawable.ic_control_pause, bgColor = "#251D4D", density) { view ->
+        // Record Button (Shown when NOT recording -> starts recording!)
+        val recBtn = createActionButton(R.drawable.ic_control_record, bgColor = "#F0446A", density) {
+            onRecordClick()
+        }
+        recordBtn = recBtn
+        bar.addView(recBtn)
+
+        // Pause / Resume Button (Shown when recording)
+        val pBtn = createActionButton(
+            if (isPaused) R.drawable.ic_control_play else R.drawable.ic_control_pause,
+            bgColor = "#251D4D",
+            density
+        ) { view ->
             isPaused = !isPaused
             onPauseResumeClick(isPaused)
             (view as ImageView).setImageResource(
                 if (isPaused) R.drawable.ic_control_play else R.drawable.ic_control_pause
             )
         }
-        bar.addView(pauseBtn)
+        pauseBtn = pBtn
+        bar.addView(pBtn)
 
         // Stop Button (Pink Disc with clean solid stop square)
-        val stopBtn = createActionButton(R.drawable.ic_control_stop, bgColor = "#F0446A", density) {
+        val sBtn = createActionButton(R.drawable.ic_control_stop, bgColor = "#F0446A", density) {
             onStopClick()
         }
-        bar.addView(stopBtn)
+        stopBtn = sBtn
+        bar.addView(sBtn)
 
         // Pen & Tools Toggle Button
         val penBtn = createActionButton(R.drawable.ic_control_pen, bgColor = "#251D4D", density) {
@@ -184,8 +236,8 @@ class FloatingControlsOverlay(
             bar.addView(facecamBtn)
         }
 
-        // Mic Mute Button
-        val micBtn = createActionButton(R.drawable.ic_control_mic, bgColor = "#251D4D", density) { view ->
+        // Mic Mute Button (Shown when recording)
+        val mBtn = createActionButton(R.drawable.ic_control_mic, bgColor = "#251D4D", density) { view ->
             isMuted = !isMuted
             onMicMuteClick(isMuted)
             (view as ImageView).setImageResource(
@@ -193,16 +245,25 @@ class FloatingControlsOverlay(
             )
             view.alpha = if (isMuted) 0.45f else 1.0f
         }
-        bar.addView(micBtn)
+        micBtn = mBtn
+        bar.addView(mBtn)
+
+        // Close Button (Shown when idle -> dismisses floating controls)
+        val cBtn = createActionButton(R.drawable.ic_control_close, bgColor = "#251D4D", density) {
+            remove()
+            onCloseClick?.invoke()
+        }
+        closeBtn = cBtn
+        bar.addView(cBtn)
 
         // Collapse Button (›)
         val collapseBtn = TextView(context).apply {
             text = "›"
-            textSize = 22f
+            textSize = 20f
             setTextColor(Color.parseColor("#B8A7FF"))
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
-            setPadding((8 * density).toInt(), 0, (6 * density).toInt(), 0)
+            setPadding((6 * density).toInt(), 0, (6 * density).toInt(), 0)
             isClickable = true
             setOnClickListener { toggleExpandCollapse() }
         }
@@ -213,7 +274,7 @@ class FloatingControlsOverlay(
 
     @SuppressLint("ClickableViewAccessibility")
     private fun buildCollapsedBubble(density: Float, params: WindowManager.LayoutParams, root: View): View {
-        val bubbleSize = (48 * density).toInt()
+        val bubbleSize = (44 * density).toInt()
 
         val bubble = FrameLayout(context).apply {
             layoutParams = FrameLayout.LayoutParams(bubbleSize, bubbleSize)
@@ -228,7 +289,7 @@ class FloatingControlsOverlay(
         val cameraIcon = ImageView(context).apply {
             setImageResource(R.drawable.ic_control_camera)
             setColorFilter(Color.parseColor("#B8A7FF"))
-            val iconPad = (13 * density).toInt()
+            val iconPad = (11 * density).toInt()
             setPadding(iconPad, iconPad, iconPad, iconPad)
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
@@ -242,14 +303,15 @@ class FloatingControlsOverlay(
             val dotSize = (8 * density).toInt()
             layoutParams = FrameLayout.LayoutParams(dotSize, dotSize).apply {
                 gravity = Gravity.TOP or Gravity.END
-                topMargin = (6 * density).toInt()
-                rightMargin = (6 * density).toInt()
+                topMargin = (5 * density).toInt()
+                rightMargin = (5 * density).toInt()
             }
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
                 setColor(Color.parseColor("#F0446A"))
             }
         }
+        recordingDot = dot
         bubble.addView(dot)
 
         // Dragging & Click to expand on collapsed bubble
@@ -327,15 +389,16 @@ class FloatingControlsOverlay(
     }
 
     private fun createActionButton(iconRes: Int, bgColor: String, density: Float, onClick: (View) -> Unit): ImageView {
-        val btnSize = (36 * density).toInt()
-        val pad = (8 * density).toInt()
+        val btnSize = (32 * density).toInt()
+        val pad = (7 * density).toInt()
 
         return ImageView(context).apply {
             setImageResource(iconRes)
             setPadding(pad, pad, pad, pad)
             setColorFilter(Color.WHITE)
             layoutParams = LinearLayout.LayoutParams(btnSize, btnSize).apply {
-                setMargins((3 * density).toInt(), 0, (3 * density).toInt(), 0)
+                val m = (2.5f * density).toInt()
+                setMargins(m, 0, m, 0)
             }
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL

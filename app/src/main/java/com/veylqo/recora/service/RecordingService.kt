@@ -117,6 +117,7 @@ class RecordingService : Service() {
         notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         overlayManager = com.veylqo.recora.service.overlay.OverlayManager(
             context = this,
+            onStartRecording = null,
             onStopRecording = { stopRecordingSession() },
             onPauseResume = { isPaused -> if (isPaused) pauseRecording() else resumeRecording() },
             onScreenshot = {
@@ -124,7 +125,9 @@ class RecordingService : Service() {
             },
             onMicMute = { isMuted ->
                 // Mic mute indicator
-            }
+            },
+            initialIsRecording = true,
+            initialIsPaused = false
         )
         createNotificationChannels()
     }
@@ -369,6 +372,7 @@ class RecordingService : Service() {
                 val notification = buildRecordingNotification(isPaused = true)
                 notificationManager.notify(NOTIFICATION_RECORDING_ID, notification)
                 updateState(RecordingStatus.PAUSED)
+                overlayManager.updateRecordingState(isRecording = true, isPaused = true)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to pause recording", e)
             }
@@ -385,6 +389,7 @@ class RecordingService : Service() {
                 notificationManager.notify(NOTIFICATION_RECORDING_ID, notification)
                 startTimer()
                 updateState(RecordingStatus.RECORDING)
+                overlayManager.updateRecordingState(isRecording = true, isPaused = false)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to resume recording", e)
             }
@@ -395,6 +400,7 @@ class RecordingService : Service() {
         if (!isRecording) return
         isRecording = false
         isPaused = false
+        overlayManager.updateRecordingState(isRecording = false, isPaused = false)
         timerJob?.cancel()
 
         // 1. Instantly dismiss foreground notification and screen overlays on Main thread so SystemUI is lag-free!
