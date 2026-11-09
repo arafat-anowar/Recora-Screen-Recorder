@@ -82,6 +82,8 @@ class FacecamOverlay(
         val container = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
+            clipChildren = false
+            clipToPadding = false
         }
 
         // =====================================================================
@@ -89,6 +91,8 @@ class FacecamOverlay(
         // =====================================================================
         val toolbar = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
+            clipChildren = false
+            clipToPadding = false
             setPadding((8 * density).toInt(), (4 * density).toInt(), (8 * density).toInt(), (4 * density).toInt())
             background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
@@ -130,7 +134,13 @@ class FacecamOverlay(
         }
         toolbar.addView(closeBtn)
 
-        container.addView(toolbar)
+        val toolbarParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+        }
+        container.addView(toolbar, toolbarParams)
 
         // =====================================================================
         // 2. Pure Clean Circular Camera Bubble (Zero buttons inside covering face!)
@@ -198,6 +208,10 @@ class FacecamOverlay(
                             height = newSizePx
                         }
                         circleFrame.requestLayout()
+                        container.requestLayout()
+                        try {
+                            windowManager.updateViewLayout(container, params)
+                        } catch (e: Exception) {}
                     }
                     lastClickTime = now
                     true
@@ -231,7 +245,7 @@ class FacecamOverlay(
     }
 
     private fun createExternalToolButton(iconRes: Int, density: Float, onClick: () -> Unit): ImageView {
-        val btnSize = (32 * density).toInt()
+        val btnSize = (30 * density).toInt()
         val pad = (6 * density).toInt()
 
         return ImageView(context).apply {
@@ -239,7 +253,8 @@ class FacecamOverlay(
             setPadding(pad, pad, pad, pad)
             setColorFilter(Color.WHITE)
             layoutParams = LinearLayout.LayoutParams(btnSize, btnSize).apply {
-                setMargins((4 * density).toInt(), 0, (4 * density).toInt(), 0)
+                val horizMargin = (3 * density).toInt()
+                setMargins(horizMargin, 0, horizMargin, 0)
             }
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
